@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OliMoney — Gestão financeira para assistências técnicas</title>
+<meta name="description" content="Controle faturamento, lucro, estoque e ordens de serviço da sua assistência técnica em um só lugar. Teste grátis por 7 dias.">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Work+Sans:ital,wght@0,400;0,500;0,600;1,500&family=IBM+Plex+Mono:wght@500;600&display=swap');
+
+:root{
+  --bg:#EEF1EE; --surface:#FFFFFF; --surface-2:#F7F8F5;
+  --ink:#182420; --ink-soft:#4B5751; --muted:#818C84; --line:#DADFD8;
+  --copper:#C4622D; --copper-dark:#A34F22; --copper-tint:#F3E1D5;
+  --teal:#1F6F5C; --teal-tint:#DCEDE8; --amber:#C99A2E; --amber-tint:#F4EAD2;
+  --shadow:0 1px 2px rgba(24,36,32,.06), 0 6px 20px -8px rgba(24,36,32,.15);
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{margin:0; background:var(--bg); color:var(--ink); font-family:'Work Sans',sans-serif; font-size:15.5px; line-height:1.6; -webkit-font-smoothing:antialiased;}
+.display{font-family:'Barlow Condensed',sans-serif; letter-spacing:.01em;}
+a{color:inherit;}
+.wrap{max-width:1080px; margin:0 auto; padding:0 24px;}
+
+/* header */
+header{position:sticky; top:0; z-index:30; background:rgba(238,241,238,.9); backdrop-filter:blur(8px); border-bottom:1px solid var(--line);}
+.headbar{display:flex; align-items:center; justify-content:space-between; padding:14px 24px;}
+.brand{display:flex; align-items:center; gap:9px;}
+.brand-mark{width:32px;height:32px;border-radius:8px; background:linear-gradient(155deg,var(--copper),var(--copper-dark)); display:flex; align-items:center; justify-content:center; flex:0 0 32px;}
+.brand-mark svg{width:18px;height:18px;}
+.brand-name{font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:21px;}
+.brand-sub{font-size:10px; text-transform:uppercase; letter-spacing:.13em; color:var(--muted); margin-top:-3px;}
+.nav-links{display:flex; align-items:center; gap:26px; font-size:14px; font-weight:500;}
+.nav-links a.navitem{color:var(--ink-soft); text-decoration:none;}
+.nav-links a.navitem:hover{color:var(--ink);}
+@media (max-width:720px){ .nav-links .navitem{display:none;} }
+
+.btn{display:inline-flex; align-items:center; gap:8px; padding:11px 20px; border-radius:9px; border:1px solid var(--line); background:var(--surface); color:var(--ink); font-weight:600; font-size:14px; cursor:pointer; text-decoration:none; font-family:inherit;}
+.btn-primary{background:var(--copper); border-color:var(--copper-dark); color:#fff;}
+.btn-primary:hover{background:var(--copper-dark);}
+.btn-lg{padding:14px 26px; font-size:15px;}
+.btn-ghost{border-color:transparent; background:transparent;}
+
+/* hero */
+.hero{padding:64px 24px 40px 24px;}
+.hero-inner{max-width:1080px; margin:0 auto; display:grid; grid-template-columns:1.1fr .9fr; gap:44px; align-items:center;}
+.eyebrow{display:inline-flex; align-items:center; gap:7px; background:var(--copper-tint); color:var(--copper-dark); font-size:12px; font-weight:700; padding:6px 12px; border-radius:20px; text-transform:uppercase; letter-spacing:.06em; margin-bottom:18px;}
+.hero h1{font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:46px; line-height:1.08; margin:0 0 16px 0;}
+.hero h1 span{color:var(--copper);}
+.hero p{color:var(--ink-soft); font-size:16.5px; max-width:480px; margin-bottom:26px;}
+.hero-cta{display:flex; align-items:center; gap:14px; flex-wrap:wrap;}
+.hero-note{font-size:12.5px; color:var(--muted); margin-top:14px;}
+
+/* mock ticket visual */
+.mock-card{background:var(--surface); border:1px solid var(--line); border-radius:14px; box-shadow:0 20px 50px -18px rgba(24,36,32,.25); padding:20px; }
+.mock-kpis{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px;}
+.mock-kpi{border:1px solid var(--line); border-radius:9px; padding:11px 13px; background:var(--surface-2);}
+.mock-kpi .l{font-size:10px; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); font-weight:700;}
+.mock-kpi .v{font-family:'IBM Plex Mono',monospace; font-size:17px; font-weight:600; margin-top:4px;}
+.mock-ticket{display:flex; border:1px solid var(--line); border-radius:10px; overflow:hidden; margin-top:6px;}
+.mock-stub{flex:0 0 54px; background:var(--ink); color:#EDEFEB; display:flex; align-items:center; justify-content:center; font-family:'IBM Plex Mono',monospace; font-size:11px; writing-mode:vertical-rl; transform:rotate(180deg);}
+.mock-body{padding:10px 13px; flex:1;}
+.mock-body .t{font-weight:700; font-size:13.5px;}
+.mock-body .s{font-size:11.5px; color:var(--muted); margin-top:2px;}
+.mock-pill{display:inline-block; margin-top:7px; font-size:10px; font-weight:700; padding:3px 9px; border-radius:20px; background:var(--teal-tint); color:var(--teal); text-transform:uppercase; letter-spacing:.05em;}
+@media (max-width:860px){ .hero-inner{grid-template-columns:1fr;} .hero h1{font-size:36px;} }
+
+/* sections */
+section{padding:64px 24px;}
+.section-head{text-align:center; max-width:600px; margin:0 auto 40px auto;}
+.section-head .eyebrow{margin-bottom:12px;}
+.section-head h2{font-family:'Barlow Condensed',sans-serif; font-size:32px; font-weight:700; margin:0 0 10px 0;}
+.section-head p{color:var(--ink-soft); font-size:15px;}
+
+.features{display:grid; grid-template-columns:repeat(4,1fr); gap:16px; max-width:1080px; margin:0 auto;}
+.feature-card{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:22px 20px;}
+.feature-icon{width:38px;height:38px; border-radius:9px; background:var(--copper-tint); display:flex; align-items:center; justify-content:center; margin-bottom:14px;}
+.feature-icon svg{width:19px;height:19px; stroke:var(--copper-dark);}
+.feature-card h3{font-family:'Barlow Condensed',sans-serif; font-size:19px; font-weight:700; margin:0 0 6px 0;}
+.feature-card p{color:var(--ink-soft); font-size:13.5px; margin:0;}
+@media (max-width:860px){ .features{grid-template-columns:1fr 1fr;} }
+@media (max-width:560px){ .features{grid-template-columns:1fr;} }
+
+.steps{max-width:900px; margin:0 auto; display:grid; grid-template-columns:repeat(3,1fr); gap:26px;}
+.step{text-align:center;}
+.step-num{width:40px;height:40px; border-radius:50%; background:var(--ink); color:#fff; display:flex; align-items:center; justify-content:center; font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:18px; margin:0 auto 14px auto;}
+.step h3{font-family:'Barlow Condensed',sans-serif; font-size:18px; font-weight:700; margin:0 0 6px 0;}
+.step p{color:var(--ink-soft); font-size:13.5px; margin:0;}
+@media (max-width:720px){ .steps{grid-template-columns:1fr; gap:30px;} }
+
+.pricing-wrap{display:flex; justify-content:center;}
+.price-card{background:var(--ink); color:#EDEFEB; border-radius:16px; padding:38px 34px; max-width:420px; width:100%; text-align:center; box-shadow:var(--shadow);}
+.price-card .trial-tag{display:inline-block; background:rgba(196,98,45,.22); color:#F0B48A; font-size:11.5px; font-weight:700; padding:5px 12px; border-radius:20px; text-transform:uppercase; letter-spacing:.06em; margin-bottom:16px;}
+.price-num{font-family:'Barlow Condensed',sans-serif; font-size:52px; font-weight:700; margin:6px 0 0 0;}
+.price-num span{font-size:17px; font-weight:500; color:#9DA79F;}
+.price-sub{color:#9DA79F; font-size:13px; margin-bottom:22px;}
+.price-list{list-style:none; padding:0; margin:0 0 26px 0; text-align:left; display:inline-block;}
+.price-list li{display:flex; align-items:center; gap:9px; font-size:14px; margin-bottom:11px; color:#DDE3DA;}
+.price-list svg{width:16px;height:16px; stroke:var(--teal); flex:0 0 16px;}
+.price-card .btn-primary{width:100%; justify-content:center;}
+
+footer{border-top:1px solid var(--line); padding:28px 24px; text-align:center; color:var(--muted); font-size:12.5px;}
+footer a{text-decoration:underline; cursor:pointer;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="headbar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+      </div>
+      <div>
+        <div class="brand-name">OliMoney</div>
+        <div class="brand-sub">Assistência Técnica</div>
+      </div>
+    </div>
+    <nav class="nav-links">
+      <a class="navitem" href="#recursos">Recursos</a>
+      <a class="navitem" href="#como-funciona">Como funciona</a>
+      <a class="navitem" href="#preco">Preço</a>
+      <a class="btn btn-ghost" href="olimoney.html">Entrar</a>
+      <a class="btn btn-primary" href="olimoney.html?signup=1">Teste grátis</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="hero-inner">
+    <div>
+      <div class="eyebrow">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+        7 dias de teste grátis
+      </div>
+      <h1>Controle o financeiro da sua <span>assistência técnica</span> sem planilha</h1>
+      <p>Faturamento, lucro, gastos, estoque, preços e ordens de serviço — tudo em um painel só, feito para o dia a dia de quem conserta celular, notebook e eletrônicos.</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary btn-lg" href="olimoney.html?signup=1">
+          Começar teste grátis
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+        <a class="btn btn-lg" href="olimoney.html">Já tenho conta</a>
+      </div>
+      <div class="hero-note">Sem cartão de crédito para começar. Depois do teste, R$ 39,99/mês.</div>
+    </div>
+    <div class="mock-card">
+      <div class="mock-kpis">
+        <div class="mock-kpi"><div class="l">Faturamento</div><div class="v" style="color:var(--teal)">R$ 4.280</div></div>
+        <div class="mock-kpi"><div class="l">Lucro líquido</div><div class="v">R$ 2.150</div></div>
+      </div>
+      <div class="mock-ticket">
+        <div class="mock-stub">#A29F1</div>
+        <div class="mock-body">
+          <div class="t">Marcos Andrade</div>
+          <div class="s">iPhone 12 — tela trincada</div>
+          <span class="mock-pill">Finalizada</span>
+        </div>
+      </div>
+      <div class="mock-ticket">
+        <div class="mock-stub">#B0C4E</div>
+        <div class="mock-body">
+          <div class="t">Loja Central</div>
+          <div class="s">Notebook Dell — não liga</div>
+          <span class="mock-pill" style="background:var(--amber-tint); color:#8A6A1B;">Em andamento</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="recursos">
+  <div class="section-head">
+    <div class="eyebrow">Recursos</div>
+    <h2>Feito para o dia a dia da oficina</h2>
+    <p>Cada tela pensada pra quem recebe cliente no balcão, conserta na bancada e fecha o caixa no fim do dia.</p>
+  </div>
+  <div class="features">
+    <div class="feature-card">
+      <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3a2 2 0 0 0 0-4V7z"/></svg></div>
+      <h3>Ordens de Serviço</h3>
+      <p>Cliente, aparelho, defeito, valor e status — com termo de garantia pronto pra imprimir.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8L12 3 3 8l9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/></svg></div>
+      <h3>Estoque e preços</h3>
+      <p>Produtos, peças, marca, modelo e alerta automático quando o estoque fica baixo.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg></div>
+      <h3>Painel financeiro</h3>
+      <p>Faturamento, custo, gastos e lucro líquido do mês, com gráfico e histórico de vendas.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></div>
+      <h3>Controle de garantia</h3>
+      <p>Prazo automático, aviso de retorno em garantia e histórico de tudo o que já passou pela loja.</p>
+    </div>
+  </div>
+</section>
+
+<section id="como-funciona" style="background:var(--surface-2); border-top:1px solid var(--line); border-bottom:1px solid var(--line);">
+  <div class="section-head">
+    <div class="eyebrow">Como funciona</div>
+    <h2>Pronto pra usar em 3 passos</h2>
+  </div>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <h3>Crie sua conta</h3>
+      <p>Cadastro rápido com e-mail e senha. 7 dias grátis, sem cartão.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <h3>Cadastre sua loja</h3>
+      <p>Coloque seus produtos, preços e as ordens de serviço em andamento.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <h3>Acompanhe o lucro</h3>
+      <p>O painel calcula faturamento, custo e lucro pra você, todo dia.</p>
+    </div>
+  </div>
+</section>
+
+<section id="preco">
+  <div class="section-head">
+    <div class="eyebrow">Preço</div>
+    <h2>Simples, sem pegadinha</h2>
+    <p>Um plano único, com tudo incluso.</p>
+  </div>
+  <div class="pricing-wrap">
+    <div class="price-card">
+      <span class="trial-tag">7 dias grátis</span>
+      <div class="price-num">R$ 39,99<span>/mês</span></div>
+      <div class="price-sub">Cancele quando quiser</div>
+      <ul class="price-list">
+        <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Ordens de serviço ilimitadas</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Controle de estoque e preços</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Painel de faturamento e lucro</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Termo de garantia para imprimir</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Histórico completo de vendas</li>
+      </ul>
+      <a class="btn btn-primary" href="olimoney.html?signup=1">Começar teste grátis</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  © <span id="year"></span> OliMoney — feito para assistências técnicas. <a href="olimoney.html">Entrar no sistema</a>
+</footer>
+
+<script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+</body>
+</html>
