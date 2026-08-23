@@ -287,6 +287,16 @@ tbody tr:hover{background:var(--surface-2);}
 .color-dot{width:10px;height:10px;border-radius:50%; display:inline-block; border:1px solid rgba(0,0,0,.15); margin-right:5px; vertical-align:middle;}
 .subtle{font-size:11.5px; color:var(--muted); margin-top:1px;}
 
+.autocomplete-results{
+  position:absolute; top:100%; left:0; right:0; z-index:60; background:var(--surface);
+  border:1px solid var(--line); border-radius:9px; box-shadow:var(--shadow);
+  max-height:220px; overflow-y:auto; margin-top:4px;
+}
+.autocomplete-item{padding:9px 12px; cursor:pointer; border-bottom:1px solid var(--line); font-size:13px;}
+.autocomplete-item:last-child{border-bottom:none;}
+.autocomplete-item:hover{background:var(--surface-2);}
+.autocomplete-empty{padding:12px; font-size:12.5px; color:var(--muted); text-align:center;}
+
 /* ---------- auth screen ---------- */
 .auth-screen{
   display:none; min-height:100vh; align-items:center; justify-content:center; padding:20px;
@@ -360,20 +370,20 @@ tbody tr:hover{background:var(--surface-2);}
   #app{flex-direction:column;}
   .sidebar{
     width:100%; height:auto; position:sticky; top:0; flex-direction:row; align-items:center;
-    padding:8px 12px; overflow-x:auto; z-index:20; transition:transform .22s ease;
+    padding:6px 10px; overflow-x:auto; z-index:20; transition:transform .22s ease;
   }
   .sidebar.sidebar-hidden{transform:translateY(-100%);}
-  .brand{border:none; padding:0 10px 0 0; margin:0;}
-  .brand-mark{width:24px; height:24px; flex:0 0 24px;}
-  .brand-mark svg{width:14px; height:14px;}
-  .brand-name{font-size:16px;}
-  .brand-sub{font-size:8px;}
+  .brand{border:none; padding:0 8px 0 0; margin:0;}
+  .brand-mark{width:20px; height:20px; flex:0 0 20px; border-radius:6px;}
+  .brand-mark svg{width:12px; height:12px;}
+  .brand-name{font-size:14px;}
+  .brand-sub{font-size:7px;}
   .side-foot{display:none;}
   nav.navlist{flex-direction:row; flex:none; gap:1px;}
   .navlink span{display:none;}
-  .navlink{padding:7px;}
-  .navlink svg{width:15px; height:15px;}
-  .side-logout-mobile{display:inline-flex;}
+  .navlink{padding:6px;}
+  .navlink svg{width:14px; height:14px;}
+  .side-logout-mobile{display:inline-flex; width:28px; height:28px;}
   .topbar,.content{padding-left:16px; padding-right:16px;}
   .trial-banner{margin-left:16px; margin-right:16px;}
   .admin-panel{width:calc(100% - 32px); right:16px; left:16px;}
@@ -492,8 +502,14 @@ tbody tr:hover{background:var(--surface-2);}
           <div class="panel">
             <div class="panel-head">
               <div>
-                <div class="panel-title">Receita x Saídas — últimos 6 meses</div>
-                <div class="panel-sub">Comparativo mensal de faturamento e (custos + gastos)</div>
+                <div class="panel-title" id="chartTitle">Receita x Saídas</div>
+                <div class="panel-sub">Comparativo de faturamento e (custos + gastos)</div>
+              </div>
+              <div class="filter-bar">
+                <button class="btn btn-sm" data-chart-gran="dia">Dia</button>
+                <button class="btn btn-sm" data-chart-gran="semana">Semana</button>
+                <button class="btn btn-sm" data-chart-gran="mes">Mês</button>
+                <button class="btn btn-sm" data-chart-gran="ano">Ano</button>
               </div>
             </div>
             <div id="chartWrap"></div>
@@ -1137,21 +1153,57 @@ function renderDashboard(){
   renderDashSales();
 }
 
-function renderChart(){
-  const wrap = document.getElementById('chartWrap');
-  const months = [];
-  const base = dashMonthInput.value ? new Date(dashMonthInput.value+"-01") : new Date();
-  for(let i=5;i>=0;i--){
-    const d = new Date(base.getFullYear(), base.getMonth()-i, 1);
-    months.push(localISOMonth(d));
+let chartGranularity = 'mes';
+document.querySelectorAll('[data-chart-gran]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{ chartGranularity = btn.dataset.chartGran; renderChart(); });
+});
+
+function buildChartBuckets(gran){
+  const today = new Date();
+  const buckets = [];
+  if(gran==='dia'){
+    for(let i=13;i>=0;i--){
+      const d = new Date(today); d.setDate(d.getDate()-i);
+      const iso = localISODate(d);
+      buckets.push({label:`${pad2(d.getDate())}/${pad2(d.getMonth()+1)}`, from:iso, to:iso});
+    }
+  } else if(gran==='semana'){
+    for(let i=7;i>=0;i--){
+      const end = new Date(today); end.setDate(end.getDate() - i*7);
+      const start = new Date(end); start.setDate(start.getDate()-6);
+      buckets.push({label:`${pad2(start.getDate())}/${pad2(start.getMonth()+1)}`, from:localISODate(start), to:localISODate(end)});
+    }
+  } else if(gran==='ano'){
+    for(let i=4;i>=0;i--){
+      const y = today.getFullYear()-i;
+      buckets.push({label:String(y), from:`${y}-01-01`, to:`${y}-12-31`});
+    }
+  } else {
+    const base = dashMonthInput.value ? parseISODateLocal(dashMonthInput.value+"-01") : today;
+    const monthNames = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    for(let i=5;i>=0;i--){
+      const d = new Date(base.getFullYear(), base.getMonth()-i, 1);
+      const [from,to] = monthRange(localISOMonth(d));
+      buckets.push({label:monthNames[d.getMonth()], from, to});
+    }
   }
-  const data = months.map(m=>{
-    const [from,to] = monthRange(m);
-    const t = computeTotals(from,to);
-    return {m, revenue:t.revenue, out:t.cost+t.expense};
+  return buckets;
+}
+
+function renderChart(){
+  document.querySelectorAll('[data-chart-gran]').forEach(b=>b.classList.toggle('active', b.dataset.chartGran===chartGranularity));
+  const titleMap = {dia:'Receita x Saídas — últimos 14 dias', semana:'Receita x Saídas — últimas 8 semanas', mes:'Receita x Saídas — últimos 6 meses', ano:'Receita x Saídas — últimos 5 anos'};
+  document.getElementById('chartTitle').textContent = titleMap[chartGranularity];
+
+  const wrap = document.getElementById('chartWrap');
+  const buckets = buildChartBuckets(chartGranularity);
+  const data = buckets.map(b=>{
+    const t = computeTotals(b.from, b.to);
+    return {label:b.label, revenue:t.revenue, out:t.cost+t.expense};
   });
   const max = Math.max(1, ...data.map(d=>Math.max(d.revenue,d.out)));
-  const W=560,H=190,padL=6,padB=26,groupW=W/data.length;
+  const W=560,H=190,padB=26,groupW=W/data.length;
+  const fontSize = data.length>10 ? 8 : 10;
   let bars='';
   data.forEach((d,i)=>{
     const x0 = i*groupW;
@@ -1161,9 +1213,7 @@ function renderChart(){
     const yBase = H-padB;
     bars += `<rect x="${x0+groupW*0.18}" y="${yBase-hRev}" width="${bw}" height="${hRev}" rx="2" fill="var(--teal)"></rect>`;
     bars += `<rect x="${x0+groupW*0.52}" y="${yBase-hOut}" width="${bw}" height="${hOut}" rx="2" fill="var(--red)"></rect>`;
-    const [yy,mm] = d.m.split('-');
-    const lbl = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][Number(mm)-1];
-    bars += `<text x="${x0+groupW/2}" y="${H-8}" text-anchor="middle" font-size="10" fill="var(--muted)" font-family="Work Sans">${lbl}</text>`;
+    bars += `<text x="${x0+groupW/2}" y="${H-8}" text-anchor="middle" font-size="${fontSize}" fill="var(--muted)" font-family="Work Sans">${d.label}</text>`;
   });
   wrap.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;">
     <line x1="0" y1="${H-padB}" x2="${W}" y2="${H-padB}" stroke="var(--line)"></line>
@@ -1357,8 +1407,7 @@ function printWarranty(order){
   if(!order) return;
   const endereco = [order.rua, order.numero ? `nº ${order.numero}` : '', order.bairro].filter(Boolean).join(', ') || '—';
   const garantiaTxt = order.garantiaAte ? `${order.garantiaDias || 90} dias, válida até ${fmtDate(order.garantiaAte)}` : `${order.garantiaDias || 90} dias a partir da entrega`;
-  const win = window.open('', '_blank');
-  win.document.write(`
+  const htmlContent = `
     <!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Termo de Garantia - OS #${order.id.slice(-5).toUpperCase()}</title>
     <style>
       body{font-family:Arial,Helvetica,sans-serif; color:#182420; padding:36px; max-width:720px; margin:0 auto; font-size:13.5px; line-height:1.55;}
@@ -1407,10 +1456,34 @@ function printWarranty(order){
         <div>Assinatura do cliente</div>
         <div>Assinatura do técnico</div>
       </div>
-    </body></html>`);
-  win.document.close();
-  win.focus();
-  setTimeout(()=>win.print(), 300);
+    </body></html>`;
+
+  /* usa um iframe oculto em vez de window.open: no mobile, popups de nova aba
+     costumam ser bloqueados ou não conseguem chamar print() corretamente */
+  let printFrame = document.getElementById('printFrame');
+  if(!printFrame){
+    printFrame = document.createElement('iframe');
+    printFrame.id = 'printFrame';
+    printFrame.style.position = 'fixed';
+    printFrame.style.right = '0';
+    printFrame.style.bottom = '0';
+    printFrame.style.width = '0';
+    printFrame.style.height = '0';
+    printFrame.style.border = '0';
+    document.body.appendChild(printFrame);
+  }
+  try{
+    const doc = printFrame.contentWindow.document;
+    doc.open();
+    doc.write(htmlContent);
+    doc.close();
+    setTimeout(()=>{
+      try{
+        printFrame.contentWindow.focus();
+        printFrame.contentWindow.print();
+      }catch(e){ showToast('Não foi possível abrir a impressão neste navegador.'); }
+    }, 350);
+  }catch(e){ showToast('Não foi possível gerar o termo de garantia.'); }
 }
 
 function openOrderModal(order){
@@ -1634,14 +1707,10 @@ function openCartModal(){
 
   document.getElementById('modalTitle').textContent = 'Nova Venda';
   document.getElementById('modalBody').innerHTML = `
-    <div class="field full" style="margin-bottom:10px;">
+    <div class="field full" style="margin-bottom:10px; position:relative;">
       <label>Produto</label>
-      <select id="cartProdSelect">
-        ${state.products.map(p=>{
-          const detalhes = [p.marca, p.modelo, p.cor].filter(Boolean).join(' · ');
-          return `<option value="${p.id}">${esc(p.nome)}${detalhes?` — ${esc(detalhes)}`:''} (estoque: ${p.estoque})</option>`;
-        }).join('')}
-      </select>
+      <input id="cartProdSearch" type="text" placeholder="Digite o nome, marca ou modelo..." autocomplete="off">
+      <div id="cartProdResults" class="autocomplete-results" style="display:none;"></div>
     </div>
     <div style="display:flex; gap:8px; margin-bottom:16px;">
       <input id="cartQtdInput" type="number" min="1" step="1" value="1" style="width:80px;">
@@ -1665,6 +1734,36 @@ function openCartModal(){
       <div class="hs-label">Resumo</div>
       <div id="cartResumo" style="font-size:13px; line-height:1.8; margin-top:6px;"></div>
     </div>`;
+
+  let selectedProduct = null;
+  const searchInput = document.getElementById('cartProdSearch');
+  const resultsEl = document.getElementById('cartProdResults');
+  function renderProdResults(query){
+    const q = query.trim().toLowerCase();
+    const matches = state.products.filter(p=>{
+      if(!q) return true;
+      return p.nome.toLowerCase().includes(q) || (p.marca||'').toLowerCase().includes(q) || (p.modelo||'').toLowerCase().includes(q) || (p.cor||'').toLowerCase().includes(q);
+    }).slice(0,8);
+    if(matches.length===0){ resultsEl.innerHTML = `<div class="autocomplete-empty">Nenhum produto encontrado</div>`; resultsEl.style.display='block'; return; }
+    resultsEl.innerHTML = matches.map(p=>{
+      const detalhes = [p.marca, p.modelo, p.cor].filter(Boolean).join(' · ');
+      return `<div class="autocomplete-item" data-pick="${p.id}"><b>${esc(p.nome)}</b>${detalhes?` <span class="subtle">— ${esc(detalhes)}</span>`:''}<div class="subtle">Estoque: ${p.estoque} · ${fmt(p.precoVenda)}</div></div>`;
+    }).join('');
+    resultsEl.style.display='block';
+  }
+  searchInput.addEventListener('focus', ()=> renderProdResults(searchInput.value));
+  searchInput.addEventListener('input', ()=>{ selectedProduct = null; renderProdResults(searchInput.value); });
+  resultsEl.addEventListener('click', e=>{
+    const item = e.target.closest('[data-pick]');
+    if(!item) return;
+    selectedProduct = state.products.find(p=>p.id===item.dataset.pick);
+    searchInput.value = selectedProduct.nome;
+    resultsEl.style.display='none';
+  });
+  document.addEventListener('click', function outsideClick(e){
+    if(!document.body.contains(searchInput)){ document.removeEventListener('click', outsideClick); return; }
+    if(e.target!==searchInput && !e.target.closest('#cartProdResults')) resultsEl.style.display='none';
+  });
 
   function renderCartItems(){
     const wrap = document.getElementById('cartItemsWrap');
@@ -1703,8 +1802,8 @@ function openCartModal(){
   }
 
   document.getElementById('cartAddBtn').addEventListener('click', ()=>{
-    const sel = document.getElementById('cartProdSelect');
-    const p = state.products.find(p=>p.id===sel.value);
+    const p = selectedProduct;
+    if(!p){ showToast('Selecione um produto da lista'); return; }
     const qtd = Number(document.getElementById('cartQtdInput').value||1);
     if(qtd<=0){ showToast('Quantidade inválida'); return; }
     const jaNoCarrinho = cart.filter(it=>it.produtoId===p.id).reduce((s,it)=>s+it.quantidade,0);
@@ -1715,6 +1814,9 @@ function openCartModal(){
       cart.push({produtoId:p.id, produtoNome:p.nome, marca:p.marca, modelo:p.modelo, cor:p.cor,
         quantidade:qtd, precoUnit:p.precoVenda, custoUnit:p.precoCusto, estoqueMax:p.estoque});
     }
+    searchInput.value = '';
+    selectedProduct = null;
+    document.getElementById('cartQtdInput').value = 1;
     renderCartItems();
   });
   document.getElementById('cartItemsWrap').addEventListener('input', e=>{
