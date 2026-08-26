@@ -297,6 +297,18 @@ tbody tr:hover{background:var(--surface-2);}
 .autocomplete-item:hover{background:var(--surface-2);}
 .autocomplete-empty{padding:12px; font-size:12.5px; color:var(--muted); text-align:center;}
 
+.checklist-row{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:7px 0; border-bottom:1px solid var(--line);}
+.checklist-row:last-child{border-bottom:none;}
+.checklist-label{font-size:13px; color:var(--ink);}
+.checklist-btns{display:flex; gap:4px; flex:0 0 auto;}
+.checklist-btn{
+  font-size:11px; font-weight:700; padding:5px 10px; border-radius:6px; border:1px solid var(--line);
+  background:var(--surface); color:var(--muted); cursor:pointer; font-family:inherit;
+}
+.checklist-btn.active-ok{background:var(--teal-tint); border-color:var(--teal); color:var(--teal);}
+.checklist-btn.active-falha{background:var(--red-tint); border-color:var(--red); color:var(--red);}
+.checklist-btn.active-nt{background:var(--surface-2); border-color:var(--muted); color:var(--ink-soft);}
+
 /* ---------- auth screen ---------- */
 .auth-screen{
   display:none; min-height:100vh; align-items:center; justify-content:center; padding:20px;
@@ -369,7 +381,7 @@ tbody tr:hover{background:var(--surface-2);}
 @media (max-width:860px){
   #app{flex-direction:column;}
   .sidebar{
-    flex: 0 0 auto; width:100%; height:100px; position:sticky; top:0; flex-direction:row; align-items:center;
+    width:100%; height:auto; position:sticky; top:0; flex-direction:row; align-items:center;
     padding:6px 10px; overflow-x:auto; z-index:20; transition:transform .22s ease;
   }
   .sidebar.sidebar-hidden{transform:translateY(-100%);}
@@ -804,7 +816,8 @@ function orderFromDb(r){
     valorServico:Number(r.valor_servico||0), custoPecas:Number(r.custo_pecas||0), status:r.status,
     dataAbertura:r.data_abertura, pago:r.pago, dataPagamento:r.data_pagamento||'', observacoes:r.observacoes||'',
     garantiaDias:r.garantia_dias==null?90:Number(r.garantia_dias), garantiaAte:r.garantia_ate||'',
-    retornouGarantia:!!r.retornou_garantia, dataRetornoGarantia:r.data_retorno_garantia||''};
+    retornouGarantia:!!r.retornou_garantia, dataRetornoGarantia:r.data_retorno_garantia||'',
+    checklist: r.checklist || {}};
 }
 function orderToDb(o){
   return {cliente:o.cliente, telefone:o.telefone, cpf:o.cpf, rua:o.rua, numero:o.numero, bairro:o.bairro,
@@ -812,8 +825,32 @@ function orderToDb(o){
     custo_pecas:o.custoPecas, status:o.status, data_abertura:o.dataAbertura, pago:o.pago,
     data_pagamento:o.dataPagamento||null, observacoes:o.observacoes, garantia_dias:o.garantiaDias,
     garantia_ate:o.garantiaAte||null, retornou_garantia:o.retornouGarantia,
-    data_retorno_garantia:o.dataRetornoGarantia||null};
+    data_retorno_garantia:o.dataRetornoGarantia||null, checklist:o.checklist||{}};
 }
+
+const CHECKLIST_ITEMS = [
+  {key:'tela', label:'Tela / Touch'},
+  {key:'tela_trincada', label:'Tela trincada ou arranhada'},
+  {key:'cam_frontal', label:'Câmera frontal'},
+  {key:'cam_traseira', label:'Câmera traseira'},
+  {key:'flash', label:'Flash'},
+  {key:'alto_falante', label:'Alto-falante (mãos livres)'},
+  {key:'auricular', label:'Auricular (chamada)'},
+  {key:'microfone', label:'Microfone'},
+  {key:'btn_liga', label:'Botão liga/desliga'},
+  {key:'btn_volume', label:'Botões de volume'},
+  {key:'biometria', label:'Biometria (digital/facial)'},
+  {key:'carregamento', label:'Carregamento'},
+  {key:'bateria', label:'Bateria'},
+  {key:'wifi', label:'Wi-Fi'},
+  {key:'bluetooth', label:'Bluetooth'},
+  {key:'sinal', label:'Sinal / Chip'},
+  {key:'vibracao', label:'Vibração'},
+  {key:'sensor_prox', label:'Sensor de proximidade'},
+  {key:'carcaca', label:'Carcaça / tampa traseira'}
+];
+const CHECKLIST_STATUS_LABEL = {ok:'OK', falha:'Falha', nt:'Não testado'};
+
 function expenseFromDb(r){ return {id:r.id, descricao:r.descricao, categoria:r.categoria, valor:Number(r.valor||0), data:r.data}; }
 function expenseToDb(g){ return {descricao:g.descricao, categoria:g.categoria, valor:g.valor, data:g.data}; }
 function saleFromDb(r){
@@ -1421,6 +1458,7 @@ function printWarranty(order){
       .clauses li{margin-bottom:6px;}
       .sign{display:flex; justify-content:space-between; margin-top:60px;}
       .sign div{width:45%; text-align:center; border-top:1px solid #333; padding-top:6px; font-size:12px;}
+      .checklist-print td{font-size:12px; padding:3px 4px; border-bottom:1px dashed #ddd;}
       @media print{ body{padding:10mm;} }
     </style></head><body>
       <h1>Termo de Garantia</h1>
@@ -1444,12 +1482,40 @@ function printWarranty(order){
         <tr><td class="lbl">Prazo de garantia</td><td>${esc(garantiaTxt)}</td></tr>
       </table>
 
+      <h2>Checklist de diagnóstico (teste na entrada)</h2>
+      <table class="checklist-print">
+        ${(() => {
+          const cl = order.checklist || {};
+          const symbol = {ok:'✓ OK', falha:'✗ Falha', nt:'— Não testado'};
+          const color = {ok:'#1F6F5C', falha:'#B23A2E', nt:'#888'};
+          const cols = [[],[]];
+          CHECKLIST_ITEMS.forEach((it,i)=> cols[i%2].push(it));
+          const rowsCount = Math.max(cols[0].length, cols[1].length);
+          let rows = '';
+          for(let i=0;i<rowsCount;i++){
+            rows += '<tr>';
+            [0,1].forEach(c=>{
+              const it = cols[c][i];
+              if(it){
+                const st = cl[it.key] || 'nt';
+                rows += `<td style="width:38%;">${esc(it.label)}</td><td style="width:12%; font-weight:600; color:${color[st]};">${symbol[st]}</td>`;
+              } else {
+                rows += `<td></td><td></td>`;
+              }
+            });
+            rows += '</tr>';
+          }
+          return rows;
+        })()}
+      </table>
+
       <h2>Condições da garantia</h2>
       <ul class="clauses">
         <li>Esta garantia cobre exclusivamente o defeito relatado e o serviço/peça descritos acima.</li>
         <li>A garantia perde a validade em casos de: contato com líquido, queda, impacto ou dano físico após o serviço; violação, abertura ou intervenção por terceiros não autorizados; uso indevido do aparelho.</li>
         <li>Para acionar a garantia, é necessário apresentar este termo e a ordem de serviço correspondente.</li>
         <li>Fora das condições acima, novos reparos poderão ser orçados normalmente.</li>
+        <li>O checklist acima reflete o estado do aparelho constatado na entrada, conferido e aceito pelo cliente.</li>
       </ul>
 
       <div class="sign">
@@ -1491,7 +1557,9 @@ function openOrderModal(order){
   order = order || {id:null, cliente:'', telefone:'', cpf:'', rua:'', numero:'', bairro:'', senhaAparelho:'',
     aparelho:'', defeito:'', valorServico:0, custoPecas:0,
     status:'Aberta', dataAbertura:todayISO(), pago:false, dataPagamento:'', observacoes:'',
-    garantiaDias:90, garantiaAte:'', retornouGarantia:false, dataRetornoGarantia:''};
+    garantiaDias:90, garantiaAte:'', retornouGarantia:false, dataRetornoGarantia:'', checklist:{}};
+  let checklistState = {};
+  CHECKLIST_ITEMS.forEach(it=> checklistState[it.key] = (order.checklist && order.checklist[it.key]) || 'nt');
   document.getElementById('modalTitle').textContent = editing ? 'Editar Ordem de Serviço' : 'Nova Ordem de Serviço';
   document.getElementById('modalBody').innerHTML = `
     <div class="form-grid">
@@ -1507,6 +1575,13 @@ function openOrderModal(order){
       <div class="field"><label>Aparelho / Modelo</label><input id="f_aparelho" value="${esc(order.aparelho)}" placeholder="Ex: iPhone 12"></div>
       <div class="field"><label>Senha do aparelho</label><input id="f_senha" value="${esc(order.senhaAparelho||'')}" placeholder="PIN / padrão (uso interno)"></div>
       <div class="field full"><label>Defeito relatado</label><textarea id="f_defeito" rows="2" placeholder="Descreva o problema...">${esc(order.defeito)}</textarea></div>
+
+      <div class="form-section-title">Checklist de diagnóstico (teste na entrada)</div>
+      <div class="field full" style="margin:0 0 4px 0;">
+        <div class="subtle">Toque para marcar OK, Falha ou Não testado em cada item. Isso vai junto na impressão.</div>
+      </div>
+      <div class="field full" id="checklistWrap" style="margin-top:6px;"></div>
+
       <div class="field"><label>Valor do serviço (R$)</label><input id="f_valor" type="number" step="0.01" min="0" value="${order.valorServico}"></div>
       <div class="field"><label>Custo de peças (R$)</label><input id="f_custo" type="number" step="0.01" min="0" value="${order.custoPecas}"></div>
       <div class="field"><label>Status</label>
@@ -1536,6 +1611,29 @@ function openOrderModal(order){
       </div>
       <div class="field" id="wrap_dataRetorno" style="${order.retornouGarantia?'':'display:none;'}"><label>Data do retorno</label><input id="f_dataRetorno" type="date" value="${order.dataRetornoGarantia||todayISO()}"></div>
     </div>`;
+
+  function renderChecklist(){
+    const wrap = document.getElementById('checklistWrap');
+    wrap.innerHTML = CHECKLIST_ITEMS.map(it=>{
+      const s = checklistState[it.key];
+      return `<div class="checklist-row">
+        <span class="checklist-label">${esc(it.label)}</span>
+        <div class="checklist-btns">
+          <button type="button" class="checklist-btn ${s==='ok'?'active-ok':''}" data-check-key="${it.key}" data-check-status="ok">OK</button>
+          <button type="button" class="checklist-btn ${s==='falha'?'active-falha':''}" data-check-key="${it.key}" data-check-status="falha">Falha</button>
+          <button type="button" class="checklist-btn ${s==='nt'?'active-nt':''}" data-check-key="${it.key}" data-check-status="nt">N/T</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  renderChecklist();
+  document.getElementById('checklistWrap').addEventListener('click', e=>{
+    const btn = e.target.closest('[data-check-key]');
+    if(!btn) return;
+    checklistState[btn.dataset.checkKey] = btn.dataset.checkStatus;
+    renderChecklist();
+  });
+
   document.getElementById('f_pago').addEventListener('change', function(){
     document.getElementById('wrap_dataPagamento').style.display = this.checked ? '' : 'none';
   });
@@ -1571,6 +1669,7 @@ function openOrderModal(order){
     order.garantiaAte = garantiaAte;
     order.retornouGarantia = document.getElementById('f_retornouGarantia').checked;
     order.dataRetornoGarantia = order.retornouGarantia ? (document.getElementById('f_dataRetorno').value || todayISO()) : '';
+    order.checklist = checklistState;
     try{
       if(!editing){
         const payload = Object.assign(orderToDb(order), {user_id: currentUser.id});
