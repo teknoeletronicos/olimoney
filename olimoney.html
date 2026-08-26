@@ -1384,6 +1384,7 @@ function renderOrders(){
           <div class="meta-item">${o.pago ? `<span class="pill pill-teal">Pago em ${fmtDate(o.dataPagamento)}</span>` : `<span class="pill pill-amber">Não pago</span>`}</div>
           ${warrantyBadge ? `<div class="meta-item">${warrantyBadge}</div>` : ''}
           <div class="ticket-actions">
+            <button class="icon-btn" title="Imprimir recibo de entrada" data-print-intake="${o.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15l2 2 4-4"/></svg></button>
             <button class="icon-btn" title="Imprimir termo de garantia" data-print-order="${o.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></button>
             <button class="icon-btn" title="${o.retornouGarantia ? 'Desfazer retorno em garantia' : 'Marcar retorno em garantia'}" data-toggle-warranty="${o.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></button>
             <button class="icon-btn" title="Editar" data-edit-order="${o.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
@@ -1399,6 +1400,7 @@ document.getElementById('ordersList').addEventListener('click', async e=>{
   const ed = e.target.closest('[data-edit-order]');
   const del = e.target.closest('[data-del-order]');
   const prt = e.target.closest('[data-print-order]');
+  const prti = e.target.closest('[data-print-intake]');
   const wrt = e.target.closest('[data-toggle-warranty]');
   if(ed) openOrderModal(state.orders.find(o=>o.id===ed.dataset.editOrder));
   if(del){
@@ -1413,6 +1415,7 @@ document.getElementById('ordersList').addEventListener('click', async e=>{
     }
   }
   if(prt) printWarranty(state.orders.find(o=>o.id===prt.dataset.printOrder));
+  if(prti) printIntakeReceipt(state.orders.find(o=>o.id===prti.dataset.printIntake));
   if(wrt) toggleWarrantyReturn(state.orders.find(o=>o.id===wrt.dataset.toggleWarranty));
 });
 
@@ -1438,6 +1441,108 @@ async function toggleWarrantyReturn(order){
       }catch(e){ showToast('Erro: ' + e.message); }
     }
   }
+}
+
+function buildChecklistTableHtml(order){
+  const cl = order.checklist || {};
+  const symbol = {ok:'✓ OK', falha:'✗ Falha', nt:'— Não testado'};
+  const color = {ok:'#1F6F5C', falha:'#B23A2E', nt:'#888'};
+  const cols = [[],[]];
+  CHECKLIST_ITEMS.forEach((it,i)=> cols[i%2].push(it));
+  const rowsCount = Math.max(cols[0].length, cols[1].length);
+  let rows = '';
+  for(let i=0;i<rowsCount;i++){
+    rows += '<tr>';
+    [0,1].forEach(c=>{
+      const it = cols[c][i];
+      if(it){
+        const st = cl[it.key] || 'nt';
+        rows += `<td style="width:38%;">${esc(it.label)}</td><td style="width:12%; font-weight:600; color:${color[st]};">${symbol[st]}</td>`;
+      } else {
+        rows += `<td></td><td></td>`;
+      }
+    });
+    rows += '</tr>';
+  }
+  return rows;
+}
+
+function printIntakeReceipt(order){
+  if(!order) return;
+  const endereco = [order.rua, order.numero ? `nº ${order.numero}` : '', order.bairro].filter(Boolean).join(', ') || '—';
+  const htmlContent = `
+    <!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Recibo de Entrada - OS #${order.id.slice(-5).toUpperCase()}</title>
+    <style>
+      body{font-family:Arial,Helvetica,sans-serif; color:#182420; padding:36px; max-width:720px; margin:0 auto; font-size:13.5px; line-height:1.55;}
+      h1{font-size:20px; margin-bottom:2px;}
+      h2{font-size:13px; text-transform:uppercase; letter-spacing:.06em; margin:22px 0 8px 0; border-bottom:1px solid #ccc; padding-bottom:4px;}
+      .sub{color:#555; margin-bottom:18px; font-size:12px;}
+      table{width:100%; border-collapse:collapse; margin-bottom:6px;}
+      td{padding:4px 0; vertical-align:top; font-size:13px;}
+      td.lbl{color:#666; width:170px; font-weight:600;}
+      .checklist-print td{font-size:12px; padding:3px 4px; border-bottom:1px dashed #ddd;}
+      .decl{font-size:12px; color:#333; margin-top:16px; background:#f5f5f0; padding:12px 14px; border-radius:6px;}
+      .sign{display:flex; justify-content:space-between; margin-top:60px;}
+      .sign div{width:45%; text-align:center; border-top:1px solid #333; padding-top:6px; font-size:12px;}
+      @media print{ body{padding:10mm;} }
+    </style></head><body>
+      <h1>Recibo de Entrada de Aparelho</h1>
+      <div class="sub">Ordem de Serviço nº ${order.id.slice(-5).toUpperCase()} — recebido em ${fmtDate(order.dataAbertura)}</div>
+
+      <h2>Dados do cliente</h2>
+      <table>
+        <tr><td class="lbl">Nome</td><td>${esc(order.cliente)}</td></tr>
+        <tr><td class="lbl">CPF</td><td>${esc(order.cpf||'—')}</td></tr>
+        <tr><td class="lbl">Endereço</td><td>${esc(endereco)}</td></tr>
+        <tr><td class="lbl">Telefone</td><td>${esc(order.telefone||'—')}</td></tr>
+      </table>
+
+      <h2>Dados do aparelho</h2>
+      <table>
+        <tr><td class="lbl">Aparelho / Modelo</td><td>${esc(order.aparelho)}</td></tr>
+        <tr><td class="lbl">Defeito relatado</td><td>${esc(order.defeito||'—')}</td></tr>
+      </table>
+
+      <h2>Checklist de diagnóstico (constatado na entrada)</h2>
+      <table class="checklist-print">
+        ${buildChecklistTableHtml(order)}
+      </table>
+
+      <div class="decl">
+        Declaro que o aparelho descrito acima foi entregue pelo cliente nas condições constatadas no checklist,
+        antes de qualquer intervenção técnica. O orçamento e o prazo de garantia serão definidos após a avaliação/reparo.
+      </div>
+
+      <div class="sign">
+        <div>Assinatura do cliente</div>
+        <div>Assinatura do técnico</div>
+      </div>
+    </body></html>`;
+
+  let printFrame = document.getElementById('printFrame');
+  if(!printFrame){
+    printFrame = document.createElement('iframe');
+    printFrame.id = 'printFrame';
+    printFrame.style.position = 'fixed';
+    printFrame.style.right = '0';
+    printFrame.style.bottom = '0';
+    printFrame.style.width = '0';
+    printFrame.style.height = '0';
+    printFrame.style.border = '0';
+    document.body.appendChild(printFrame);
+  }
+  try{
+    const doc = printFrame.contentWindow.document;
+    doc.open();
+    doc.write(htmlContent);
+    doc.close();
+    setTimeout(()=>{
+      try{
+        printFrame.contentWindow.focus();
+        printFrame.contentWindow.print();
+      }catch(e){ showToast('Não foi possível abrir a impressão neste navegador.'); }
+    }, 350);
+  }catch(e){ showToast('Não foi possível gerar o recibo de entrada.'); }
 }
 
 function printWarranty(order){
@@ -1484,29 +1589,7 @@ function printWarranty(order){
 
       <h2>Checklist de diagnóstico (teste na entrada)</h2>
       <table class="checklist-print">
-        ${(() => {
-          const cl = order.checklist || {};
-          const symbol = {ok:'✓ OK', falha:'✗ Falha', nt:'— Não testado'};
-          const color = {ok:'#1F6F5C', falha:'#B23A2E', nt:'#888'};
-          const cols = [[],[]];
-          CHECKLIST_ITEMS.forEach((it,i)=> cols[i%2].push(it));
-          const rowsCount = Math.max(cols[0].length, cols[1].length);
-          let rows = '';
-          for(let i=0;i<rowsCount;i++){
-            rows += '<tr>';
-            [0,1].forEach(c=>{
-              const it = cols[c][i];
-              if(it){
-                const st = cl[it.key] || 'nt';
-                rows += `<td style="width:38%;">${esc(it.label)}</td><td style="width:12%; font-weight:600; color:${color[st]};">${symbol[st]}</td>`;
-              } else {
-                rows += `<td></td><td></td>`;
-              }
-            });
-            rows += '</tr>';
-          }
-          return rows;
-        })()}
+        ${buildChecklistTableHtml(order)}
       </table>
 
       <h2>Condições da garantia</h2>
