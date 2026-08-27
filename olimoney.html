@@ -309,6 +309,15 @@ tbody tr:hover{background:var(--surface-2);}
 .checklist-btn.active-falha{background:var(--red-tint); border-color:var(--red); color:var(--red);}
 .checklist-btn.active-nt{background:var(--surface-2); border-color:var(--muted); color:var(--ink-soft);}
 
+.media-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(96px,1fr)); gap:10px;}
+.media-item{position:relative; border-radius:8px; overflow:hidden; border:1px solid var(--line); aspect-ratio:1/1; background:#0d1210; display:block;}
+.media-item img, .media-item video{width:100%; height:100%; object-fit:cover; display:block;}
+.media-play{position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); color:#fff; font-size:22px; text-shadow:0 1px 4px rgba(0,0,0,.6); pointer-events:none;}
+.media-tag{position:absolute; bottom:4px; left:4px; background:rgba(0,0,0,.6); color:#fff; font-size:9px; padding:2px 7px; border-radius:10px; text-transform:uppercase; letter-spacing:.04em;}
+.media-del{position:absolute; top:3px; right:3px; background:rgba(0,0,0,.55) !important; color:#fff !important; width:24px; height:24px;}
+.media-del:hover{background:rgba(178,58,46,.85) !important;}
+.upload-label{display:inline-flex; align-items:center; gap:8px; cursor:pointer;}
+
 /* ---------- auth screen ---------- */
 .auth-screen{
   display:none; min-height:100vh; align-items:center; justify-content:center; padding:20px;
@@ -381,7 +390,7 @@ tbody tr:hover{background:var(--surface-2);}
 @media (max-width:860px){
   #app{flex-direction:column;}
   .sidebar{
-    width:100%; flex: 0 0 auto; height:100px; position:sticky; top:0; flex-direction:row; align-items:center;
+    width:100%; height:auto; position:sticky; top:0; flex-direction:row; align-items:center;
     padding:6px 10px; overflow-x:auto; z-index:20; transition:transform .22s ease;
   }
   .sidebar.sidebar-hidden{transform:translateY(-100%);}
@@ -775,7 +784,7 @@ const PAYMENT_LINK_URL = ""; // COLE AQUI o link de pagamento (Stripe/Mercado Pa
 const LICENSE_SECRET = "olimoney-2026-troque-este-segredo";
 
 /* ============================= STATE ============================= */
-let state = { products: [], orders: [], expenses: [], sales: [], saleItems: [] };
+let state = { products: [], orders: [], expenses: [], sales: [], saleItems: [], orderMedia: [] };
 let currentUser = null;
 let license = { trialStart: null, licensed: false, email: '' };
 
@@ -870,26 +879,32 @@ function saleItemToDb(si){
   return {sale_id:si.saleId, produto_id:si.produtoId, produto_nome:si.produtoNome, marca:si.marca,
     modelo:si.modelo, cor:si.cor, quantidade:si.quantidade, preco_unit:si.precoUnit, custo_unit:si.custoUnit};
 }
+function orderMediaFromDb(r){
+  return {id:r.id, orderId:r.order_id, tipo:r.tipo, etapa:r.etapa, path:r.path, url:r.url, createdAt:r.created_at};
+}
 
 async function fetchAllData(){
   try{
-    const [pr, or_, ex, sa, si] = await Promise.all([
+    const [pr, or_, ex, sa, si, om] = await Promise.all([
       sb.from('products').select('*').order('nome'),
       sb.from('orders').select('*').order('data_abertura', {ascending:false}),
       sb.from('expenses').select('*').order('data', {ascending:false}),
       sb.from('sales').select('*').order('data', {ascending:false}),
-      sb.from('sale_items').select('*')
+      sb.from('sale_items').select('*'),
+      sb.from('order_media').select('*').order('created_at', {ascending:false})
     ]);
     if(pr.error) throw pr.error;
     if(or_.error) throw or_.error;
     if(ex.error) throw ex.error;
     if(sa.error) throw sa.error;
     if(si.error) throw si.error;
+    if(om.error) throw om.error;
     state.products = pr.data.map(productFromDb);
     state.orders = or_.data.map(orderFromDb);
     state.expenses = ex.data.map(expenseFromDb);
     state.sales = sa.data.map(saleFromDb);
     state.saleItems = si.data.map(saleItemFromDb);
+    state.orderMedia = om.data.map(orderMediaFromDb);
   }catch(e){
     showToast('Erro ao carregar dados: ' + e.message);
   }
@@ -1387,6 +1402,7 @@ function renderOrders(){
             <button class="icon-btn" title="Imprimir recibo de entrada" data-print-intake="${o.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15l2 2 4-4"/></svg></button>
             <button class="icon-btn" title="Imprimir termo de garantia" data-print-order="${o.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></button>
             <button class="icon-btn" title="${o.retornouGarantia ? 'Desfazer retorno em garantia' : 'Marcar retorno em garantia'}" data-toggle-warranty="${o.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></button>
+            <button class="icon-btn" title="Fotos e vídeos" data-media-order="${o.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>
             <button class="icon-btn" title="Editar" data-edit-order="${o.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
             <button class="icon-btn btn-danger" title="Excluir" data-del-order="${o.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg></button>
           </div>
@@ -1402,6 +1418,7 @@ document.getElementById('ordersList').addEventListener('click', async e=>{
   const prt = e.target.closest('[data-print-order]');
   const prti = e.target.closest('[data-print-intake]');
   const wrt = e.target.closest('[data-toggle-warranty]');
+  const med = e.target.closest('[data-media-order]');
   if(ed) openOrderModal(state.orders.find(o=>o.id===ed.dataset.editOrder));
   if(del){
     if(confirm('Excluir esta ordem de serviço?')){
@@ -1417,6 +1434,7 @@ document.getElementById('ordersList').addEventListener('click', async e=>{
   if(prt) printWarranty(state.orders.find(o=>o.id===prt.dataset.printOrder));
   if(prti) printIntakeReceipt(state.orders.find(o=>o.id===prti.dataset.printIntake));
   if(wrt) toggleWarrantyReturn(state.orders.find(o=>o.id===wrt.dataset.toggleWarranty));
+  if(med) openMediaModal(state.orders.find(o=>o.id===med.dataset.mediaOrder));
 });
 
 async function toggleWarrantyReturn(order){
@@ -1633,6 +1651,136 @@ function printWarranty(order){
       }catch(e){ showToast('Não foi possível abrir a impressão neste navegador.'); }
     }, 350);
   }catch(e){ showToast('Não foi possível gerar o termo de garantia.'); }
+}
+
+/* ============================= FOTOS E VÍDEOS DA ORDEM ============================= */
+const MEDIA_BUCKET = 'order-media';
+const MAX_VIDEO_BYTES = 25 * 1024 * 1024;
+
+function resizeImage(file, maxDim=1600, quality=0.82){
+  return new Promise((resolve)=>{
+    const reader = new FileReader();
+    reader.onload = e=>{
+      const img = new Image();
+      img.onload = ()=>{
+        let {width, height} = img;
+        if(width>maxDim || height>maxDim){
+          if(width>=height){ height = Math.round(height*(maxDim/width)); width = maxDim; }
+          else { width = Math.round(width*(maxDim/height)); height = maxDim; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        canvas.toBlob(blob=> resolve(blob || file), 'image/jpeg', quality);
+      };
+      img.onerror = ()=> resolve(file);
+      img.src = e.target.result;
+    };
+    reader.onerror = ()=> resolve(file);
+    reader.readAsDataURL(file);
+  });
+}
+
+async function uploadMediaFile(order, file, etapa){
+  const isVideo = file.type.startsWith('video/');
+  if(isVideo && file.size > MAX_VIDEO_BYTES){
+    showToast('Vídeo muito grande (máx. 25MB) — grave um clipe mais curto');
+    return;
+  }
+  showToast('Enviando...');
+  let blobToUpload = file;
+  let ext = 'jpg';
+  if(!isVideo){
+    blobToUpload = await resizeImage(file);
+  } else {
+    ext = (file.name.split('.').pop() || 'mp4').toLowerCase();
+  }
+  const path = `${currentUser.id}/${order.id}/${Date.now()}-${Math.random().toString(36).slice(2,7)}.${ext}`;
+  try{
+    const {error: upErr} = await sb.storage.from(MEDIA_BUCKET).upload(path, blobToUpload, {
+      contentType: isVideo ? file.type : 'image/jpeg'
+    });
+    if(upErr) throw upErr;
+    const {data:pub} = sb.storage.from(MEDIA_BUCKET).getPublicUrl(path);
+    const payload = {order_id: order.id, user_id: currentUser.id, tipo: isVideo?'video':'foto', etapa, path, url: pub.publicUrl};
+    const {data, error} = await sb.from('order_media').insert(payload).select().single();
+    if(error) throw error;
+    state.orderMedia.unshift(orderMediaFromDb(data));
+    renderMediaGrid(order.id);
+    showToast('Mídia adicionada');
+  }catch(e){ showToast('Erro ao enviar: ' + e.message); }
+}
+
+async function deleteMedia(media){
+  if(!confirm('Excluir esta foto/vídeo?')) return;
+  try{
+    await sb.storage.from(MEDIA_BUCKET).remove([media.path]);
+    const {error} = await sb.from('order_media').delete().eq('id', media.id);
+    if(error) throw error;
+    state.orderMedia = state.orderMedia.filter(m=>m.id!==media.id);
+    renderMediaGrid(media.orderId);
+    showToast('Excluído');
+  }catch(e){ showToast('Erro ao excluir: ' + e.message); }
+}
+
+function renderMediaGrid(orderId){
+  const wrap = document.getElementById('mediaGrid');
+  if(!wrap) return;
+  const items = state.orderMedia.filter(m=>m.orderId===orderId);
+  const etapaLabel = {entrada:'Entrada', durante:'Durante', entrega:'Entrega'};
+  if(items.length===0){
+    wrap.innerHTML = `<div class="empty" style="padding:20px 4px;"><div class="empty-title">Nenhuma foto ou vídeo ainda</div><div>Use os botões acima para adicionar.</div></div>`;
+    return;
+  }
+  wrap.innerHTML = `<div class="media-grid">` + items.map(m=>`
+    <a class="media-item" href="${m.url}" target="_blank" rel="noopener">
+      ${m.tipo==='video' ? `<video src="${m.url}" muted></video><span class="media-play">▶</span>` : `<img src="${m.url}" loading="lazy">`}
+      <span class="media-tag">${etapaLabel[m.etapa]||''}</span>
+      <button class="icon-btn media-del" data-del-media="${m.id}" title="Excluir" onclick="event.preventDefault()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+    </a>`).join('') + `</div>`;
+}
+document.getElementById('modalBody').addEventListener('click', e=>{
+  const del = e.target.closest('[data-del-media]');
+  if(del){
+    const m = state.orderMedia.find(x=>x.id===del.dataset.delMedia);
+    if(m) deleteMedia(m);
+  }
+});
+
+function openMediaModal(order){
+  if(!order) return;
+  document.getElementById('modalTitle').textContent = `Fotos e Vídeos — ${order.cliente}`;
+  document.getElementById('modalBody').innerHTML = `
+    <div class="field full" style="margin-bottom:12px;">
+      <label>Etapa</label>
+      <select id="mediaEtapa">
+        <option value="entrada">Entrada do aparelho</option>
+        <option value="durante" selected>Durante o reparo</option>
+        <option value="entrega">Entrega / finalizado</option>
+      </select>
+    </div>
+    <div style="display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap;">
+      <label class="btn btn-primary upload-label" style="flex:1;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        Câmera
+        <input type="file" id="mediaCameraInput" accept="image/*,video/*" capture="environment" style="display:none;">
+      </label>
+      <label class="btn upload-label" style="flex:1;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+        Galeria
+        <input type="file" id="mediaGalleryInput" accept="image/*,video/*" multiple style="display:none;">
+      </label>
+    </div>
+    <div id="mediaGrid"></div>`;
+  renderMediaGrid(order.id);
+  const handleFiles = files=>{
+    const etapa = document.getElementById('mediaEtapa').value;
+    Array.from(files).forEach(f=> uploadMediaFile(order, f, etapa));
+  };
+  document.getElementById('mediaCameraInput').addEventListener('change', e=>{ handleFiles(e.target.files); e.target.value=''; });
+  document.getElementById('mediaGalleryInput').addEventListener('change', e=>{ handleFiles(e.target.files); e.target.value=''; });
+  document.getElementById('modalSave').textContent = 'Concluído';
+  openModal(()=> true);
 }
 
 function openOrderModal(order){
@@ -2254,6 +2402,7 @@ function openModal(onSave){
 }
 function closeModal(){
   document.getElementById('modalBackdrop').classList.remove('open');
+  document.getElementById('modalSave').textContent = 'Salvar';
   currentSaveHandler = null;
 }
 document.getElementById('modalClose').addEventListener('click', closeModal);
@@ -2282,7 +2431,7 @@ async function init(){
   sb.auth.onAuthStateChange((event, session)=>{
     if(event==='SIGNED_OUT'){
       currentUser = null;
-      state = { products: [], orders: [], expenses: [], sales: [], saleItems: [] };
+      state = { products: [], orders: [], expenses: [], sales: [], saleItems: [], orderMedia: [] };
       license = { trialStart: null, licensed: false, email: '' };
       document.getElementById('authEmail').value='';
       document.getElementById('authPassword').value='';
