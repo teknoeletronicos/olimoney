@@ -1507,6 +1507,13 @@ function printIntakeReceipt(order){
       <h1>Recibo de Entrada de Aparelho</h1>
       <div class="sub">Ordem de Serviço nº ${order.id.slice(-5).toUpperCase()} — recebido em ${fmtDate(order.dataAbertura)}</div>
 
+      <h2>Dados da assistência técnica</h2>
+      <table>
+        <tr><td class="lbl">Empresa</td><td>Tekno Eletrônicos</td></tr>
+        <tr><td class="lbl">Endereço</td><td>Passagem Universal QH N39 - Terra Firme</td></tr>
+        <tr><td class="lbl">Telefone</td><td>(91) 98551-2757</td></tr>
+      </table>
+
       <h2>Dados do cliente</h2>
       <table>
         <tr><td class="lbl">Nome</td><td>${esc(order.cliente)}</td></tr>
@@ -1587,6 +1594,13 @@ function printWarranty(order){
       <h1>Termo de Garantia</h1>
       <div class="sub">Ordem de Serviço nº ${order.id.slice(-5).toUpperCase()} — emitido em ${fmtDate(todayISO())}</div>
 
+      <h2>Dados da assistência técnica</h2>
+      <table>
+        <tr><td class="lbl">Empresa</td><td>Tekno Eletrônicos</td></tr>
+        <tr><td class="lbl">Endereço</td><td>Passagem Universal QH N39 - Terra Firme</td></tr>
+        <tr><td class="lbl">Telefone</td><td>(91) 98551-2757</td></tr>
+      </table>
+
       <h2>Dados do cliente</h2>
       <table>
         <tr><td class="lbl">Nome</td><td>${esc(order.cliente)}</td></tr>
@@ -1610,14 +1624,50 @@ function printWarranty(order){
         ${buildChecklistTableHtml(order)}
       </table>
 
-      <h2>Condições da garantia</h2>
-      <ul class="clauses">
-        <li>Esta garantia cobre exclusivamente o defeito relatado e o serviço/peça descritos acima.</li>
-        <li>A garantia perde a validade em casos de: contato com líquido, queda, impacto ou dano físico após o serviço; violação, abertura ou intervenção por terceiros não autorizados; uso indevido do aparelho.</li>
-        <li>Para acionar a garantia, é necessário apresentar este termo e a ordem de serviço correspondente.</li>
-        <li>Fora das condições acima, novos reparos poderão ser orçados normalmente.</li>
-        <li>O checklist acima reflete o estado do aparelho constatado na entrada, conferido e aceito pelo cliente.</li>
-      </ul>
+      <h2>Checklist de saída/entrega do aparelho</h2>
+      <table class="checklist-print">
+        <tr><td style="width:50%"><strong>Item verificado</strong></td><td style="width:50%"><strong>Conforme</strong></td></tr>
+        <tr><td>Aparelho testado e funcionando</td><td>☐</td></tr>
+        <tr><td>Sem sinais de abertura ou intervenção</td><td>☐</td></tr>
+        <tr><td>Sem danos, riscos ou quedas após o serviço</td><td>☐</td></tr>
+        <tr><td>Sem contato com líquidos ou umidade</td><td>☐</td></tr>
+        <tr><td>Lacres e identificações intactos</td><td>☐</td></tr>
+        <tr><td>Recebido pelo cliente em perfeitas condições</td><td>☐</td></tr>
+      </table>
+
+      <h2>Cobertura da garantia</h2>
+      <div class="clauses">
+        <strong>1. DA COBERTURA DA GARANTIA</strong>
+        <p style="margin:8px 0; font-size:12px;">A garantia concedida pela Tekno Eletrônicos aplica-se exclusivamente ao serviço executado e/ou à peça, componente ou módulo substituído, conforme descrito na respectiva Ordem de Serviço.</p>
+        <p style="margin:8px 0; font-size:12px;"><strong>1.1 Durante o prazo de garantia, serão avaliados e, quando constatada a responsabilidade do serviço ou da peça instalada, poderão ser corrigidos sem custo adicional ao cliente:</strong></p>
+        <ul style="margin:4px 0; padding-left:20px; font-size:12px;">
+          <li>Defeitos de funcionamento diretamente relacionados à peça ou componente substituído;</li>
+          <li>Falhas decorrentes comprovadamente de erro de instalação, montagem ou execução do serviço realizado pela assistência técnica;</li>
+          <li>Defeitos de fabricação apresentados pela peça ou componente instalado, desde que não decorrentes de dano externo, mau uso ou qualquer outra condição posterior à entrega do aparelho;</li>
+          <li>Problemas que apresentem relação direta e comprovada com o reparo realizado, desde que o aparelho permaneça nas mesmas condições em que foi entregue e não tenha sofrido intervenção posterior.</li>
+        </ul>
+        <p style="margin:8px 0; font-size:12px;"><strong>1.2</strong> A garantia não representa cobertura integral do aparelho. Componentes, funções ou defeitos que não estejam relacionados ao serviço realizado ou à peça substituída não estarão automaticamente abrangidos pela garantia.</p>
+        <p style="margin:8px 0; font-size:12px;"><strong>1.3</strong> A constatação de eventual defeito coberto pela garantia dependerá de avaliação técnica realizada pela Tekno Eletrônicos. O simples fato de o aparelho apresentar algum problema durante o período de garantia não significa, por si só, que o reparo será considerado coberto.</p>
+      </div>
+
+      <h2>Situações não cobertas pela garantia</h2>
+      <div class="clauses">
+        <p style="margin:4px 0; font-size:12px;"><strong>A garantia não abrangerá danos, defeitos ou falhas decorrentes de:</strong></p>
+        <ul style="margin:4px 0; padding-left:20px; font-size:11.5px;">
+          <li>Quedas, impactos, pressão, torção ou qualquer outro dano físico;</li>
+          <li>Contato ou exposição a água, líquidos, umidade, vapor ou outros agentes que possam causar oxidação ou corrosão;</li>
+          <li>Mau uso, utilização inadequada ou em desacordo com as características e recomendações do fabricante;</li>
+          <li>Danos provocados por carregadores, cabos, fontes, baterias, acessórios ou outros componentes incompatíveis ou defeituosos;</li>
+          <li>Abertura, desmontagem, alteração, modificação ou tentativa de reparo realizada pelo cliente ou por terceiros após a entrega do aparelho;</li>
+          <li>Remoção, rompimento ou alteração de lacres de identificação ou elementos de segurança;</li>
+          <li>Danos estéticos ou físicos ocorridos após a entrega, incluindo riscos, trincas, quebras, amassados ou descolamentos;</li>
+          <li>Desgaste natural decorrente do uso do aparelho ou de componentes sujeitos a desgaste;</li>
+          <li>Defeitos em componentes que não tenham sido objeto do serviço realizado;</li>
+          <li>Problemas decorrentes de acessórios, periféricos ou componentes adicionais instalados pelo cliente após o serviço;</li>
+          <li>Danos decorrentes de vírus, aplicativos, alterações de software, atualizações ou modificações de sistema;</li>
+          <li>Perda, corrupção ou indisponibilidade de dados, arquivos, fotos, vídeos, contatos ou informações armazenadas no aparelho.</li>
+        </ul>
+      </div>
 
       <div class="sign">
         <div>Assinatura do cliente</div>
