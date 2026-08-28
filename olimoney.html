@@ -434,8 +434,13 @@ tbody tr:hover{background:var(--surface-2);}
       <div class="field full" style="margin-bottom:10px;"><label>Nome da assistência técnica</label><input id="authEmpresa" type="text" placeholder="Ex: TekTech Assistência" autocomplete="organization"></div>
       <div class="field full" style="margin-bottom:10px;"><label>Telefone</label><input id="authTelefone" type="tel" placeholder="(00) 00000-0000" autocomplete="tel"></div>
     </div>
-    <div class="field full" style="margin-bottom:10px;"><label>E-mail</label><input id="authEmail" type="email" placeholder="seu@email.com" autocomplete="email"></div>
-    <div class="field full" style="margin-bottom:14px;"><label>Senha</label><input id="authPassword" type="password" placeholder="Mínimo 6 caracteres" autocomplete="current-password"></div>
+    <div class="field full" id="authEmailWrap" style="margin-bottom:10px;"><label>E-mail</label><input id="authEmail" type="email" placeholder="seu@email.com" autocomplete="email"></div>
+    <div class="field full" id="authPasswordWrap" style="margin-bottom:6px;"><label>Senha</label><input id="authPassword" type="password" placeholder="Mínimo 6 caracteres" autocomplete="current-password"></div>
+    <div id="authForgotWrap" style="text-align:right; margin-bottom:14px;">
+      <a id="authForgotLink" style="font-size:12px; color:var(--copper-dark); cursor:pointer; text-decoration:underline;">Esqueci minha senha</a>
+    </div>
+    <div class="field full" id="authNewPasswordWrap" style="display:none; margin-bottom:10px;"><label>Nova senha</label><input id="authNewPassword" type="password" placeholder="Mínimo 6 caracteres" autocomplete="new-password"></div>
+    <div class="field full" id="authNewPasswordConfirmWrap" style="display:none; margin-bottom:14px;"><label>Confirmar nova senha</label><input id="authNewPasswordConfirm" type="password" placeholder="Repita a senha" autocomplete="new-password"></div>
     <button class="btn btn-primary" id="authSubmitBtn" style="width:100%; justify-content:center;">Entrar</button>
     <div class="auth-switch"><span id="authSwitchText">Ainda não tem conta?</span> <a id="authSwitchLink">Criar conta</a></div>
     <div class="auth-hint">Teste grátis por 7 dias. Depois, R$ 39,99/mês.</div>
@@ -1015,14 +1020,40 @@ function showAuthScreen(){ document.getElementById('authScreen').style.display='
 function showApp(){ document.getElementById('authScreen').style.display='none'; document.getElementById('app').style.display='flex'; }
 
 function updateAuthUI(){
-  document.getElementById('authSubmitBtn').textContent = authMode==='login' ? 'Entrar' : 'Criar conta';
-  document.getElementById('authSwitchText').textContent = authMode==='login' ? 'Ainda não tem conta?' : 'Já tem conta?';
-  document.getElementById('authSwitchLink').textContent = authMode==='login' ? 'Criar conta' : 'Entrar';
-  document.getElementById('authSignupFields').style.display = authMode==='login' ? 'none' : 'block';
+  const emailWrap = document.getElementById('authEmailWrap');
+  const passWrap = document.getElementById('authPasswordWrap');
+  const forgotWrap = document.getElementById('authForgotWrap');
+  const newPassWrap = document.getElementById('authNewPasswordWrap');
+  const newPassConfirmWrap = document.getElementById('authNewPasswordConfirmWrap');
+  const submitBtn = document.getElementById('authSubmitBtn');
+  const switchText = document.getElementById('authSwitchText');
+  const switchLink = document.getElementById('authSwitchLink');
+
+  document.getElementById('authSignupFields').style.display = authMode==='signup' ? 'block' : 'none';
+  emailWrap.style.display = (authMode==='reset') ? 'none' : '';
+  passWrap.style.display = (authMode==='login' || authMode==='signup') ? '' : 'none';
+  forgotWrap.style.display = authMode==='login' ? 'block' : 'none';
+  newPassWrap.style.display = authMode==='reset' ? '' : 'none';
+  newPassConfirmWrap.style.display = authMode==='reset' ? '' : 'none';
+
+  if(authMode==='login'){
+    submitBtn.textContent = 'Entrar'; switchText.textContent = 'Ainda não tem conta?'; switchLink.textContent = 'Criar conta'; switchLink.style.display='';
+  } else if(authMode==='signup'){
+    submitBtn.textContent = 'Criar conta'; switchText.textContent = 'Já tem conta?'; switchLink.textContent = 'Entrar'; switchLink.style.display='';
+  } else if(authMode==='recover'){
+    submitBtn.textContent = 'Enviar link de redefinição'; switchText.textContent = ''; switchLink.textContent = 'Voltar para login'; switchLink.style.display='';
+  } else if(authMode==='reset'){
+    submitBtn.textContent = 'Salvar nova senha'; switchText.textContent = ''; switchLink.style.display='none';
+  }
   document.getElementById('authError').style.display='none';
 }
 document.getElementById('authSwitchLink').addEventListener('click', e=>{
-  e.preventDefault(); authMode = authMode==='login' ? 'signup' : 'login'; updateAuthUI();
+  e.preventDefault();
+  authMode = (authMode==='recover') ? 'login' : (authMode==='login' ? 'signup' : 'login');
+  updateAuthUI();
+});
+document.getElementById('authForgotLink').addEventListener('click', ()=>{
+  authMode = 'recover'; updateAuthUI();
 });
 
 function translateAuthError(msg){
@@ -1030,20 +1061,58 @@ function translateAuthError(msg){
   if(/already registered|already exists/i.test(msg)) return 'Este e-mail já está cadastrado. Tente entrar.';
   if(/Password should be|at least 6/i.test(msg)) return 'A senha precisa ter pelo menos 6 caracteres.';
   if(/Unable to validate email/i.test(msg)) return 'E-mail inválido.';
+  if(/rate limit/i.test(msg)) return 'Muitas tentativas. Aguarde um pouco antes de tentar de novo.';
   return msg;
 }
 
 document.getElementById('authSubmitBtn').addEventListener('click', async ()=>{
-  const email = document.getElementById('authEmail').value.trim();
-  const password = document.getElementById('authPassword').value;
   const errEl = document.getElementById('authError');
   errEl.style.display='none';
+  const btn = document.getElementById('authSubmitBtn');
+  const oldTxt = btn.textContent;
+
+  if(authMode==='reset'){
+    const newPass = document.getElementById('authNewPassword').value;
+    const confirmPass = document.getElementById('authNewPasswordConfirm').value;
+    if(!newPass || newPass.length<6){ errEl.style.color='var(--red)'; errEl.textContent='A senha precisa ter pelo menos 6 caracteres.'; errEl.style.display='block'; return; }
+    if(newPass!==confirmPass){ errEl.style.color='var(--red)'; errEl.textContent='As senhas não coincidem.'; errEl.style.display='block'; return; }
+    btn.disabled = true; btn.textContent = 'Aguarde...';
+    try{
+      const {data, error} = await sb.auth.updateUser({password:newPass});
+      if(error) throw error;
+      document.getElementById('authNewPassword').value = '';
+      document.getElementById('authNewPasswordConfirm').value = '';
+      authMode = 'login';
+      showToast('Senha atualizada com sucesso!');
+      await onAuthed(data.user);
+    }catch(e){ errEl.style.color='var(--red)'; errEl.textContent = translateAuthError(e.message); errEl.style.display='block'; }
+    btn.disabled = false; btn.textContent = oldTxt;
+    return;
+  }
+
+  if(authMode==='recover'){
+    const email = document.getElementById('authEmail').value.trim();
+    if(!email){ errEl.style.color='var(--red)'; errEl.textContent='Informe seu e-mail'; errEl.style.display='block'; return; }
+    btn.disabled = true; btn.textContent = 'Aguarde...';
+    try{
+      const redirectTo = window.location.origin + window.location.pathname;
+      const {error} = await sb.auth.resetPasswordForEmail(email, {redirectTo});
+      if(error) throw error;
+      errEl.style.color='var(--teal)';
+      errEl.textContent = 'Link de redefinição enviado! Verifique seu e-mail.';
+      errEl.style.display='block';
+    }catch(e){ errEl.style.color='var(--red)'; errEl.textContent = translateAuthError(e.message); errEl.style.display='block'; }
+    btn.disabled = false; btn.textContent = oldTxt;
+    return;
+  }
+
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
   if(!email || !password){ errEl.style.color='var(--red)'; errEl.textContent='Preencha e-mail e senha'; errEl.style.display='block'; return; }
   if(authMode==='signup' && !document.getElementById('authNome').value.trim()){
     errEl.style.color='var(--red)'; errEl.textContent='Informe seu nome completo'; errEl.style.display='block'; return;
   }
-  const btn = document.getElementById('authSubmitBtn');
-  const oldTxt = btn.textContent; btn.disabled = true; btn.textContent = 'Aguarde...';
+  btn.disabled = true; btn.textContent = 'Aguarde...';
   try{
     let result;
     if(authMode==='login'){
@@ -1485,70 +1554,27 @@ function buildChecklistTableHtml(order){
   return rows;
 }
 
-/* Imprime via a própria janela (sem iframe oculto e sem window.open), que é o método
-   mais confiável no celular: iframes ocultos e pop-ups frequentemente não conseguem
-   disparar o diálogo de impressão em navegadores mobile (Chrome Android / Safari iOS). */
-function printHTMLInPage(styleCss, bodyHtml){
-  if(!document.getElementById('printAreaBaseStyles')){
-    const baseStyle = document.createElement('style');
-    baseStyle.id = 'printAreaBaseStyles';
-    baseStyle.textContent = `
-      #printArea{display:none;}
-      @media print{
-        body.printing-doc > *:not(#printArea){display:none !important;}
-        body.printing-doc #printArea{display:block !important;}
-      }
-    `;
-    document.head.appendChild(baseStyle);
-  }
-  let area = document.getElementById('printArea');
-  if(!area){
-    area = document.createElement('div');
-    area.id = 'printArea';
-    document.body.appendChild(area);
-  }
-  area.innerHTML = `<style>${styleCss}</style>${bodyHtml}`;
-  document.body.classList.add('printing-doc');
-  const cleanup = ()=>{
-    document.body.classList.remove('printing-doc');
-    window.removeEventListener('afterprint', cleanup);
-  };
-  window.addEventListener('afterprint', cleanup);
-  setTimeout(cleanup, 8000); // rede de segurança: alguns navegadores mobile não disparam 'afterprint'
-  setTimeout(()=>{
-    try{ window.print(); }
-    catch(e){ showToast('Não foi possível abrir a impressão neste navegador.'); cleanup(); }
-  }, 50);
-}
-
 function printIntakeReceipt(order){
   if(!order) return;
   const endereco = [order.rua, order.numero ? `nº ${order.numero}` : '', order.bairro].filter(Boolean).join(', ') || '—';
-  const styleCss = `
-    @media print{
-      #printArea{font-family:Arial,Helvetica,sans-serif; color:#182420; padding:10mm; max-width:720px; margin:0 auto; font-size:13.5px; line-height:1.55;}
-      #printArea h1{font-size:20px; margin-bottom:2px;}
-      #printArea h2{font-size:13px; text-transform:uppercase; letter-spacing:.06em; margin:22px 0 8px 0; border-bottom:1px solid #ccc; padding-bottom:4px;}
-      #printArea .sub{color:#555; margin-bottom:18px; font-size:12px;}
-      #printArea table{width:100%; border-collapse:collapse; margin-bottom:6px;}
-      #printArea td{padding:4px 0; vertical-align:top; font-size:13px;}
-      #printArea td.lbl{color:#666; width:170px; font-weight:600;}
-      #printArea .checklist-print td{font-size:12px; padding:3px 4px; border-bottom:1px dashed #ddd;}
-      #printArea .decl{font-size:12px; color:#333; margin-top:16px; background:#f5f5f0; padding:12px 14px; border-radius:6px;}
-      #printArea .sign{display:flex; justify-content:space-between; margin-top:60px;}
-      #printArea .sign div{width:45%; text-align:center; border-top:1px solid #333; padding-top:6px; font-size:12px;}
-    }
-  `;
-  const bodyHtml = `
+  const htmlContent = `
+    <!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Recibo de Entrada - OS #${order.id.slice(-5).toUpperCase()}</title>
+    <style>
+      body{font-family:Arial,Helvetica,sans-serif; color:#182420; padding:36px; max-width:720px; margin:0 auto; font-size:13.5px; line-height:1.55;}
+      h1{font-size:20px; margin-bottom:2px;}
+      h2{font-size:13px; text-transform:uppercase; letter-spacing:.06em; margin:22px 0 8px 0; border-bottom:1px solid #ccc; padding-bottom:4px;}
+      .sub{color:#555; margin-bottom:18px; font-size:12px;}
+      table{width:100%; border-collapse:collapse; margin-bottom:6px;}
+      td{padding:4px 0; vertical-align:top; font-size:13px;}
+      td.lbl{color:#666; width:170px; font-weight:600;}
+      .checklist-print td{font-size:12px; padding:3px 4px; border-bottom:1px dashed #ddd;}
+      .decl{font-size:12px; color:#333; margin-top:16px; background:#f5f5f0; padding:12px 14px; border-radius:6px;}
+      .sign{display:flex; justify-content:space-between; margin-top:60px;}
+      .sign div{width:45%; text-align:center; border-top:1px solid #333; padding-top:6px; font-size:12px;}
+      @media print{ body{padding:10mm;} }
+    </style></head><body>
       <h1>Recibo de Entrada de Aparelho</h1>
       <div class="sub">Ordem de Serviço nº ${order.id.slice(-5).toUpperCase()} — recebido em ${fmtDate(order.dataAbertura)}</div>
-
-      <h2>Dados da assistência técnica</h2>
-      <table>
-        <tr><td class="lbl">Empresa</td><td>Tekno Eletrônicos</td></tr>
-        <tr><td class="lbl">Endereço</td><td>Passagem Universal QH N39 - Terra Firme</td></tr>
-        <tr><td class="lbl">Telefone</td><td>(91) 98551-2757</td></tr>
-      </table>
 
       <h2>Dados do cliente</h2>
       <table>
@@ -1577,42 +1603,58 @@ function printIntakeReceipt(order){
       <div class="sign">
         <div>Assinatura do cliente</div>
         <div>Assinatura do técnico</div>
-      </div>`;
+      </div>
+    </body></html>`;
 
-  try{ printHTMLInPage(styleCss, bodyHtml); }
-  catch(e){ showToast('Não foi possível gerar o recibo de entrada.'); }
+  let printFrame = document.getElementById('printFrame');
+  if(!printFrame){
+    printFrame = document.createElement('iframe');
+    printFrame.id = 'printFrame';
+    printFrame.style.position = 'fixed';
+    printFrame.style.right = '0';
+    printFrame.style.bottom = '0';
+    printFrame.style.width = '0';
+    printFrame.style.height = '0';
+    printFrame.style.border = '0';
+    document.body.appendChild(printFrame);
+  }
+  try{
+    const doc = printFrame.contentWindow.document;
+    doc.open();
+    doc.write(htmlContent);
+    doc.close();
+    setTimeout(()=>{
+      try{
+        printFrame.contentWindow.focus();
+        printFrame.contentWindow.print();
+      }catch(e){ showToast('Não foi possível abrir a impressão neste navegador.'); }
+    }, 350);
+  }catch(e){ showToast('Não foi possível gerar o recibo de entrada.'); }
 }
 
 function printWarranty(order){
   if(!order) return;
   const endereco = [order.rua, order.numero ? `nº ${order.numero}` : '', order.bairro].filter(Boolean).join(', ') || '—';
   const garantiaTxt = order.garantiaAte ? `${order.garantiaDias || 90} dias, válida até ${fmtDate(order.garantiaAte)}` : `${order.garantiaDias || 90} dias a partir da entrega`;
-  const styleCss = `
-    @media print{
-      #printArea{font-family:Arial,Helvetica,sans-serif; color:#182420; padding:10mm; max-width:720px; margin:0 auto; font-size:13.5px; line-height:1.55;}
-      #printArea h1{font-size:20px; margin-bottom:2px;}
-      #printArea h2{font-size:13px; text-transform:uppercase; letter-spacing:.06em; margin:22px 0 8px 0; border-bottom:1px solid #ccc; padding-bottom:4px;}
-      #printArea .sub{color:#555; margin-bottom:18px; font-size:12px;}
-      #printArea table{width:100%; border-collapse:collapse; margin-bottom:6px;}
-      #printArea td{padding:4px 0; vertical-align:top; font-size:13px;}
-      #printArea td.lbl{color:#666; width:170px; font-weight:600;}
-      #printArea .clauses{font-size:12px; color:#333; margin-top:8px;}
-      #printArea .clauses li{margin-bottom:6px;}
-      #printArea .sign{display:flex; justify-content:space-between; margin-top:60px;}
-      #printArea .sign div{width:45%; text-align:center; border-top:1px solid #333; padding-top:6px; font-size:12px;}
-      #printArea .checklist-print td{font-size:12px; padding:3px 4px; border-bottom:1px dashed #ddd;}
-    }
-  `;
-  const bodyHtml = `
+  const htmlContent = `
+    <!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Termo de Garantia - OS #${order.id.slice(-5).toUpperCase()}</title>
+    <style>
+      body{font-family:Arial,Helvetica,sans-serif; color:#182420; padding:36px; max-width:720px; margin:0 auto; font-size:13.5px; line-height:1.55;}
+      h1{font-size:20px; margin-bottom:2px;}
+      h2{font-size:13px; text-transform:uppercase; letter-spacing:.06em; margin:22px 0 8px 0; border-bottom:1px solid #ccc; padding-bottom:4px;}
+      .sub{color:#555; margin-bottom:18px; font-size:12px;}
+      table{width:100%; border-collapse:collapse; margin-bottom:6px;}
+      td{padding:4px 0; vertical-align:top; font-size:13px;}
+      td.lbl{color:#666; width:170px; font-weight:600;}
+      .clauses{font-size:12px; color:#333; margin-top:8px;}
+      .clauses li{margin-bottom:6px;}
+      .sign{display:flex; justify-content:space-between; margin-top:60px;}
+      .sign div{width:45%; text-align:center; border-top:1px solid #333; padding-top:6px; font-size:12px;}
+      .checklist-print td{font-size:12px; padding:3px 4px; border-bottom:1px dashed #ddd;}
+      @media print{ body{padding:10mm;} }
+    </style></head><body>
       <h1>Termo de Garantia</h1>
       <div class="sub">Ordem de Serviço nº ${order.id.slice(-5).toUpperCase()} — emitido em ${fmtDate(todayISO())}</div>
-
-      <h2>Dados da assistência técnica</h2>
-      <table>
-        <tr><td class="lbl">Empresa</td><td>Tekno Eletrônicos</td></tr>
-        <tr><td class="lbl">Endereço</td><td>Passagem Universal QH N39 - Terra Firme</td></tr>
-        <tr><td class="lbl">Telefone</td><td>(91) 98551-2757</td></tr>
-      </table>
 
       <h2>Dados do cliente</h2>
       <table>
@@ -1637,80 +1679,47 @@ function printWarranty(order){
         ${buildChecklistTableHtml(order)}
       </table>
 
-      <h2>1. DA COBERTURA DA GARANTIA</h2>
-      <div class="clauses">
-        <p style="margin:8px 0; font-size:12px;">1.1. A garantia concedida pela TEKNO ELETRÔNICOS aplica-se exclusivamente ao serviço executado e/ou à peça, componente ou módulo substituído, conforme descrito na respectiva Ordem de Serviço.</p>
-        
-        <p style="margin:8px 0; font-size:12px;"><strong>1.2. Durante o prazo de garantia, serão avaliados e, quando constatada a responsabilidade do serviço ou da peça instalada, poderão ser corrigidos sem custo adicional ao cliente:</strong></p>
-        <ul style="margin:4px 0 8px 20px; padding:0; font-size:12px;">
-          <li>a) defeitos de funcionamento diretamente relacionados à peça ou componente substituído;</li>
-          <li>b) falhas decorrentes comprovadamente de erro de instalação, montagem ou execução do serviço realizado pela assistência técnica;</li>
-          <li>c) defeitos de fabricação apresentados pela peça ou componente instalado, desde que não decorrentes de dano externo, mau uso ou qualquer outra condição posterior à entrega do aparelho;</li>
-          <li>d) problemas que apresentem relação direta e comprovada com o reparo realizado, desde que o aparelho permaneça nas mesmas condições em que foi entregue e não tenha sofrido intervenção posterior.</li>
-        </ul>
-
-        <p style="margin:8px 0; font-size:12px;">1.3. A garantia não representa cobertura integral do aparelho. Componentes, funções ou defeitos que não estejam relacionados ao serviço realizado ou à peça substituída não estarão automaticamente abrangidos pela garantia.</p>
-
-        <p style="margin:8px 0; font-size:12px;">1.4. Em serviços realizados em placa, circuito eletrônico ou componentes internos, a garantia ficará limitada à área, componente ou defeito efetivamente reparado, não abrangendo outros componentes ou defeitos que venham a surgir posteriormente sem relação comprovada com o serviço executado.</p>
-
-        <p style="margin:8px 0; font-size:12px;">1.5. A constatação de eventual defeito coberto pela garantia dependerá de avaliação técnica realizada pela TEKNO ELETRÔNICOS. O simples fato de o aparelho apresentar algum problema durante o período de garantia não significa, por si só, que o reparo será considerado coberto.</p>
-      </div>
-
-      <h2>2. DAS SITUAÇÕES NÃO COBERTAS PELA GARANTIA</h2>
-      <div class="clauses">
-        <p style="margin:8px 0; font-size:12px;">2.1. A garantia não abrangerá danos, defeitos ou falhas decorrentes de fatos posteriores à realização do serviço, incluindo, mas não se limitando a:</p>
-        <ul style="margin:4px 0 8px 20px; padding:0; font-size:11.5px;">
-          <li>a) quedas, impactos, pressão, torção ou qualquer outro dano físico;</li>
-          <li>b) contato ou exposição a água, líquidos, umidade, vapor ou outros agentes que possam causar oxidação ou corrosão;</li>
-          <li>c) mau uso, utilização inadequada ou em desacordo com as características e recomendações do fabricante;</li>
-          <li>d) danos provocados por carregadores, cabos, fontes, baterias, acessórios ou outros componentes incompatíveis ou defeituosos;</li>
-          <li>e) sobretensão, curto-circuito, descarga elétrica ou outras ocorrências de origem elétrica externas ao serviço realizado;</li>
-          <li>f) abertura, desmontagem, alteração, modificação ou tentativa de reparo realizada pelo cliente ou por terceiros após a entrega do aparelho;</li>
-          <li>g) remoção, rompimento ou alteração de lacres de identificação ou elementos de segurança eventualmente utilizados pela assistência;</li>
-          <li>h) danos estéticos ou físicos ocorridos após a entrega do equipamento, incluindo riscos, trincas, quebras, amassados, deformações ou descolamentos decorrentes de impacto ou manuseio inadequado;</li>
-          <li>i) desgaste natural decorrente do uso do aparelho ou de componentes sujeitos a desgaste, quando não caracterizado defeito relacionado ao serviço ou à peça instalada;</li>
-          <li>j) defeitos ou falhas em componentes que não tenham sido objeto do serviço realizado;</li>
-          <li>k) problemas decorrentes de acessórios, periféricos ou componentes adicionais instalados pelo cliente após a realização do serviço;</li>
-          <li>l) danos decorrentes de vírus, aplicativos, alterações de software, atualizações, restaurações, desbloqueios, modificações de sistema ou outras intervenções de software, quando não relacionadas ao serviço contratado;</li>
-          <li>m) perda, corrupção ou indisponibilidade de dados, arquivos, fotos, vídeos, contatos, aplicativos ou demais informações armazenadas no aparelho.</li>
-        </ul>
-
-        <p style="margin:8px 0; font-size:12px;">2.2. Nos casos em que houver indícios de líquido, oxidação, impacto, intervenção de terceiros ou qualquer outra condição que possa ter relação com o defeito apresentado, o aparelho poderá ser submetido à avaliação técnica antes da definição da cobertura da garantia.</p>
-
-        <p style="margin:8px 0; font-size:12px;">2.3. Caso seja constatado que o problema apresentado não possui relação com o serviço executado ou com a peça instalada, o atendimento será considerado fora da garantia, sendo o cliente informado sobre eventual necessidade de novo orçamento antes da realização de qualquer serviço adicional.</p>
-      </div>
-
-      <h2>3. DA GARANTIA DE PEÇAS E COMPONENTES</h2>
-      <div class="clauses">
-        <p style="margin:8px 0; font-size:12px;">3.1. Quando o serviço envolver a substituição de peça ou componente, a garantia estará vinculada à peça efetivamente instalada e ao respectivo serviço de instalação, observadas as condições deste Termo e o prazo informado na Ordem de Serviço.</p>
-
-        <p style="margin:8px 0; font-size:12px;">3.2. A substituição de uma peça durante o período de garantia não implica renovação automática ou reinício do prazo de garantia originalmente aplicável, salvo quando houver disposição legal ou condição expressamente estabelecida pela assistência.</p>
-
-        <p style="margin:8px 0; font-size:12px;">3.3. Peças que apresentem sinais de dano físico, líquido, oxidação, quebra, mau uso ou intervenção posterior poderão ser submetidas à análise para determinação da cobertura.</p>
-      </div>
-
-      <h2>4. DA ANÁLISE E ATENDIMENTO EM GARANTIA</h2>
-      <div class="clauses">
-        <p style="margin:8px 0; font-size:12px;">4.1. Para solicitar atendimento em garantia, o cliente deverá apresentar o aparelho para avaliação técnica e, quando solicitado, a Ordem de Serviço e/ou o Termo de Garantia correspondente.</p>
-
-        <p style="margin:8px 0; font-size:12px;">4.2. O aparelho deverá ser apresentado em condições que permitam a realização da análise técnica.</p>
-
-        <p style="margin:8px 0; font-size:12px;">4.3. A TEKNO ELETRÔNICOS poderá realizar testes e procedimentos técnicos necessários para identificar a origem do problema informado pelo cliente.</p>
-
-        <p style="margin:8px 0; font-size:12px;">4.4. Sendo constatado que o problema está abrangido pela garantia, será realizado o procedimento necessário para correção do defeito, observadas as condições técnicas aplicáveis.</p>
-
-        <p style="margin:8px 0; font-size:12px;">4.5. Caso seja constatado que o problema não está relacionado ao serviço ou à peça anteriormente instalada, qualquer novo reparo dependerá de prévia autorização e, quando aplicável, de novo orçamento.</p>
-
-        <p style="margin:8px 0; font-size:12px;">4.6. A garantia será considerada aplicável somente aos problemas efetivamente relacionados ao serviço realizado ou à peça substituída, não abrangendo automaticamente outros defeitos identificados durante a análise.</p>
-      </div>
+      <h2>Condições da garantia</h2>
+      <ul class="clauses">
+        <li>Esta garantia cobre exclusivamente o defeito relatado e o serviço/peça descritos acima.</li>
+        <li>A garantia perde a validade em casos de: contato com líquido, queda, impacto ou dano físico após o serviço; violação, abertura ou intervenção por terceiros não autorizados; uso indevido do aparelho.</li>
+        <li>Para acionar a garantia, é necessário apresentar este termo e a ordem de serviço correspondente.</li>
+        <li>Fora das condições acima, novos reparos poderão ser orçados normalmente.</li>
+        <li>O checklist acima reflete o estado do aparelho constatado na entrada, conferido e aceito pelo cliente.</li>
+      </ul>
 
       <div class="sign">
         <div>Assinatura do cliente</div>
         <div>Assinatura do técnico</div>
-      </div>`;
+      </div>
+    </body></html>`;
 
-  try{ printHTMLInPage(styleCss, bodyHtml); }
-  catch(e){ showToast('Não foi possível gerar o termo de garantia.'); }
+  /* usa um iframe oculto em vez de window.open: no mobile, popups de nova aba
+     costumam ser bloqueados ou não conseguem chamar print() corretamente */
+  let printFrame = document.getElementById('printFrame');
+  if(!printFrame){
+    printFrame = document.createElement('iframe');
+    printFrame.id = 'printFrame';
+    printFrame.style.position = 'fixed';
+    printFrame.style.right = '0';
+    printFrame.style.bottom = '0';
+    printFrame.style.width = '0';
+    printFrame.style.height = '0';
+    printFrame.style.border = '0';
+    document.body.appendChild(printFrame);
+  }
+  try{
+    const doc = printFrame.contentWindow.document;
+    doc.open();
+    doc.write(htmlContent);
+    doc.close();
+    setTimeout(()=>{
+      try{
+        printFrame.contentWindow.focus();
+        printFrame.contentWindow.print();
+      }catch(e){ showToast('Não foi possível abrir a impressão neste navegador.'); }
+    }, 350);
+  }catch(e){ showToast('Não foi possível gerar o termo de garantia.'); }
 }
 
 /* ============================= FOTOS E VÍDEOS DA ORDEM ============================= */
@@ -2482,25 +2491,33 @@ document.getElementById('modalSave').addEventListener('click', async ()=>{
 
 /* ============================= INIT ============================= */
 async function init(){
-  try{
-    const {data:{session}} = await sb.auth.getSession();
-    if(session){ await onAuthed(session.user); }
-    else { showAuthScreen(); }
-  }catch(e){ showAuthScreen(); showToast('Erro ao verificar sessão: ' + e.message); }
+  let recoveryMode = false;
 
   sb.auth.onAuthStateChange((event, session)=>{
-    if(event==='SIGNED_OUT'){
+    if(event==='PASSWORD_RECOVERY'){
+      recoveryMode = true;
+      authMode = 'reset';
+      showAuthScreen();
+    } else if(event==='SIGNED_OUT'){
       currentUser = null;
       state = { products: [], orders: [], expenses: [], sales: [], saleItems: [], orderMedia: [] };
       license = { trialStart: null, licensed: false, email: '' };
       document.getElementById('authEmail').value='';
       document.getElementById('authPassword').value='';
+      authMode = 'login';
       showAuthScreen();
-    } else if(event==='SIGNED_IN' && !currentUser && session){
+    } else if(event==='SIGNED_IN' && !currentUser && session && !recoveryMode){
       /* cobre o retorno do link de confirmação de e-mail */
       onAuthed(session.user).then(()=> showToast('E-mail confirmado! Bem-vindo(a) 🎉'));
     }
   });
+
+  try{
+    const {data:{session}} = await sb.auth.getSession();
+    if(recoveryMode){ /* já tratado pelo evento PASSWORD_RECOVERY acima */ }
+    else if(session){ await onAuthed(session.user); }
+    else { showAuthScreen(); }
+  }catch(e){ if(!recoveryMode){ showAuthScreen(); showToast('Erro ao verificar sessão: ' + e.message); } }
 }
 init();
 
