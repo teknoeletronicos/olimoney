@@ -577,6 +577,29 @@ tbody tr:hover{background:var(--surface-2);}
       <section class="view" id="view-orders">
         <div class="toolbar">
           <div class="field">
+            <label>Mês de referência</label>
+            <input type="month" id="ordersMonth">
+          </div>
+        </div>
+        <div class="kpi-row" style="grid-template-columns:repeat(3,1fr);">
+          <div class="kpi k-revenue">
+            <div class="kpi-label">Faturamento de serviços</div>
+            <div class="kpi-value num" id="ordersKpiRevenue">R$ 0,00</div>
+            <div class="kpi-note">Ordens de serviço pagas no mês</div>
+          </div>
+          <div class="kpi k-cost">
+            <div class="kpi-label">Custo de peças</div>
+            <div class="kpi-value num" id="ordersKpiCost">R$ 0,00</div>
+            <div class="kpi-note">Peças usadas nos reparos pagos</div>
+          </div>
+          <div class="kpi k-profit">
+            <div class="kpi-label">Lucro de serviços</div>
+            <div class="kpi-value num" id="ordersKpiProfit">R$ 0,00</div>
+            <div class="kpi-note" id="ordersKpiMargin">Margem: 0%</div>
+          </div>
+        </div>
+        <div class="toolbar">
+          <div class="field">
             <label>Buscar</label>
             <input class="search-input" type="text" id="orderSearch" placeholder="Cliente ou aparelho...">
           </div>
@@ -883,7 +906,7 @@ const PAYMENT_LINK_URL = ""; // COLE AQUI o link de pagamento (Stripe/Mercado Pa
 const LICENSE_SECRET = "olimoney-2026-troque-este-segredo";
 
 /* ============================= STATE ============================= */
-let state = { products: [], orders: [], expenses: [], sales: [], saleItems: [], orderMedia: [] };
+let state = { products: [], orders: [], expenses: [], sales: [], saleItems: [], orderMedia: [], suppliers: [], supplierParts: [] };
 let currentUser = null;
 let license = { trialStart: null, licensed: false, email: '' };
 
@@ -984,13 +1007,15 @@ function orderMediaFromDb(r){
 
 async function fetchAllData(){
   try{
-    const [pr, or_, ex, sa, si, om] = await Promise.all([
+    const [pr, or_, ex, sa, si, om, sup, sp] = await Promise.all([
       sb.from('products').select('*').order('nome'),
       sb.from('orders').select('*').order('data_abertura', {ascending:false}),
       sb.from('expenses').select('*').order('data', {ascending:false}),
       sb.from('sales').select('*').order('data', {ascending:false}),
       sb.from('sale_items').select('*'),
-      sb.from('order_media').select('*').order('created_at', {ascending:false})
+      sb.from('order_media').select('*').order('created_at', {ascending:false}),
+      sb.from('suppliers').select('*').order('nome'),
+      sb.from('supplier_parts').select('*')
     ]);
     if(pr.error) throw pr.error;
     if(or_.error) throw or_.error;
@@ -998,16 +1023,25 @@ async function fetchAllData(){
     if(sa.error) throw sa.error;
     if(si.error) throw si.error;
     if(om.error) throw om.error;
+    if(sup.error) throw sup.error;
+    if(sp.error) throw sp.error;
     state.products = pr.data.map(productFromDb);
     state.orders = or_.data.map(orderFromDb);
     state.expenses = ex.data.map(expenseFromDb);
     state.sales = sa.data.map(saleFromDb);
     state.saleItems = si.data.map(saleItemFromDb);
     state.orderMedia = om.data.map(orderMediaFromDb);
+    state.suppliers = sup.data.map(supplierFromDb);
+    state.supplierParts = sp.data.map(partFromDb);
   }catch(e){
     showToast('Erro ao carregar dados: ' + e.message);
   }
 }
+
+function supplierFromDb(r){ return {id:r.id, nome:r.nome, contato:r.contato||''}; }
+function supplierToDb(s){ return {nome:s.nome, contato:s.contato}; }
+function partFromDb(r){ return {id:r.id, supplierId:r.supplier_id, nome:r.nome, preco:Number(r.preco||0)}; }
+function partToDb(p){ return {supplier_id:p.supplierId, nome:p.nome, preco:p.preco}; }
 
 /* ============================= LICENÇA / TESTE GRÁTIS ============================= */
 async function loadProfile(){
@@ -1455,7 +1489,32 @@ document.getElementById('orderSearch').addEventListener('input', renderOrders);
 document.getElementById('orderStatusFilter').addEventListener('change', renderOrders);
 document.getElementById('btnNewOrder').addEventListener('click', ()=>openOrderModal());
 
+const ordersMonthInput = document.getElementById('ordersMonth');
+ordersMonthInput.value = monthISO();
+ordersMonthInput.addEventListener('change', renderOrdersKpis);
+
+function renderOrdersKpis(){
+  const month = ordersMonthInput.value || monthISO();
+  const [from,to] = monthRange(month);
+  let revenue=0, cost=0;
+  state.orders.forEach(o=>{
+    if(o.pago && inRange(o.dataPagamento, from, to)){
+      revenue += orderRevenue(o);
+      cost += orderCost(o);
+    }
+  });
+  const profit = revenue - cost;
+  document.getElementById('ordersKpiRevenue').textContent = fmt(revenue);
+  document.getElementById('ordersKpiCost').textContent = fmt(cost);
+  const profitEl = document.getElementById('ordersKpiProfit');
+  profitEl.textContent = fmt(profit);
+  profitEl.style.color = profit<0 ? 'var(--red)' : 'var(--ink)';
+  const margin = revenue>0 ? (profit/revenue*100) : 0;
+  document.getElementById('ordersKpiMargin').textContent = `Margem: ${margin.toFixed(1)}%`;
+}
+
 function renderOrders(){
+  renderOrdersKpis();
   const q = (document.getElementById('orderSearch').value||'').toLowerCase();
   const statusF = document.getElementById('orderStatusFilter').value;
   let list = state.orders.slice().sort((a,b)=> (a.dataAbertura||'')<(b.dataAbertura||'') ? 1 : -1);
@@ -2568,37 +2627,19 @@ function exportCsv(){
 }
 
 /* ============================= SISTEMA DE FORNECEDORES ============================= */
-function getSuppliers(){
-  const stored = localStorage.getItem('olimoney_suppliers');
-  return stored ? JSON.parse(stored) : [];
-}
-
-function getParts(){
-  const stored = localStorage.getItem('olimoney_parts');
-  return stored ? JSON.parse(stored) : [];
-}
-
-function saveSuppliers(suppliers){
-  localStorage.setItem('olimoney_suppliers', JSON.stringify(suppliers));
-  renderSuppliers();
-  updateSupplierSelect();
-}
-
-function saveParts(parts){
-  localStorage.setItem('olimoney_parts', JSON.stringify(parts));
-}
+let currentOpenSupplierId = null;
 
 function renderSuppliers(){
-  const suppliers = getSuppliers();
+  const suppliers = state.suppliers;
   const list = document.getElementById('suppliersList');
   const empty = document.getElementById('suppliersEmpty');
-  
+
   if(suppliers.length === 0){
     list.innerHTML = '';
     empty.style.display = 'block';
     return;
   }
-  
+
   empty.style.display = 'none';
   list.innerHTML = suppliers.map(s=>`
     <div style="padding:12px; background:var(--surface-2); border-radius:8px; display:flex; justify-content:space-between; align-items:center; cursor:pointer; transition:background .12s;" class="supplier-item" data-supplier-id="${s.id}" data-supplier-name="${esc(s.nome)}">
@@ -2616,37 +2657,35 @@ function renderSuppliers(){
       </div>
     </div>
   `).join('');
-  
-  // Adicionar evento de clique no fornecedor
+
   document.querySelectorAll('.supplier-item').forEach(item=>{
     item.addEventListener('click', ()=>{
-      const supplierId = parseInt(item.dataset.supplierId);
+      const supplierId = item.dataset.supplierId;
       const supplierName = item.dataset.supplierName;
       showSupplierParts(supplierId, supplierName);
     });
-    // Highlight ao hover
     item.addEventListener('mouseenter', ()=> item.style.background = 'var(--surface)');
     item.addEventListener('mouseleave', ()=> item.style.background = 'var(--surface-2)');
   });
 }
 
 function updateSupplierSelect(){
-  const suppliers = getSuppliers();
+  const suppliers = state.suppliers;
   const select = document.getElementById('selectSupplier');
   const currentValue = select.value;
-  
-  select.innerHTML = '<option value="">Selecione um fornecedor</option>' + 
+
+  select.innerHTML = '<option value="">Selecione um fornecedor</option>' +
     suppliers.map(s=>`<option value="${s.id}">${esc(s.nome)}</option>`).join('');
-  
+
   select.value = currentValue;
 }
 
 function showSupplierParts(supplierId, supplierName){
-  const parts = getParts();
-  const supplierParts = parts.filter(p => p.supplierId === supplierId);
-  
+  currentOpenSupplierId = supplierId;
+  const supplierParts = state.supplierParts.filter(p => p.supplierId === supplierId);
+
   document.getElementById('selectedSupplierName').textContent = supplierName;
-  
+
   if(supplierParts.length === 0){
     document.getElementById('supplierPartsEmpty').style.display = 'block';
     document.getElementById('supplierPartsBody').innerHTML = '';
@@ -2667,26 +2706,21 @@ function showSupplierParts(supplierId, supplierName){
       </tr>
     `).join('');
   }
-  
+
   document.getElementById('supplierPartsBox').style.display = 'block';
-  
-  // Eventos para editar/deletar peças
-  document.getElementById('supplierPartsTable').addEventListener('click', e=>{
-    const edit = e.target.closest('[data-edit-part]');
-    const del = e.target.closest('[data-delete-part]');
-    if(edit) editPart(parseInt(edit.dataset.editPart), parseInt(edit.dataset.supplierId));
-    if(del) deletePart(parseInt(del.dataset.deletePart));
-  });
+}
+
+function refreshOpenSupplierParts(){
+  if(!currentOpenSupplierId) return;
+  const sup = state.suppliers.find(s=>s.id===currentOpenSupplierId);
+  if(sup) showSupplierParts(sup.id, sup.nome);
 }
 
 function addSupplier(){
-  const suppliers = getSuppliers();
-  const newId = Math.max(...suppliers.map(s=>s.id), 0) + 1;
-  
   const modalBody = document.getElementById('modalBody');
   const modalTitle = document.getElementById('modalTitle');
   modalTitle.textContent = 'Novo Fornecedor';
-  
+
   modalBody.innerHTML = `
     <div class="field">
       <label>Nome da empresa</label>
@@ -2697,9 +2731,9 @@ function addSupplier(){
       <input type="text" id="newSupplierContact" placeholder="Ex: (11) 9999-9999 | vendas@techparts.com.br">
     </div>
   `;
-  
+
   setTimeout(()=> document.getElementById('newSupplierName').focus(), 100);
-  
+
   openModal(async ()=>{
     const nome = document.getElementById('newSupplierName').value.trim();
     const contato = document.getElementById('newSupplierContact').value.trim();
@@ -2707,21 +2741,26 @@ function addSupplier(){
       showToast('Preencha o nome do fornecedor');
       return false;
     }
-    suppliers.push({id:newId, nome, contato});
-    saveSuppliers(suppliers);
+    try{
+      const payload = Object.assign(supplierToDb({nome, contato}), {user_id: currentUser.id});
+      const {data, error} = await sb.from('suppliers').insert(payload).select().single();
+      if(error) throw error;
+      state.suppliers.push(supplierFromDb(data));
+    }catch(e){ showToast('Erro ao salvar: ' + e.message); return false; }
+    renderSuppliers();
+    updateSupplierSelect();
     showToast('Fornecedor adicionado');
   });
 }
 
 function editSupplier(id){
-  const suppliers = getSuppliers();
-  const supplier = suppliers.find(s=>s.id===id);
+  const supplier = state.suppliers.find(s=>s.id===id);
   if(!supplier) return;
-  
+
   const modalBody = document.getElementById('modalBody');
   const modalTitle = document.getElementById('modalTitle');
   modalTitle.textContent = 'Editar Fornecedor';
-  
+
   modalBody.innerHTML = `
     <div class="field">
       <label>Nome da empresa</label>
@@ -2732,7 +2771,7 @@ function editSupplier(id){
       <input type="text" id="editSupplierContact" value="${esc(supplier.contato||'')}">
     </div>
   `;
-  
+
   openModal(async ()=>{
     const nome = document.getElementById('editSupplierName').value.trim();
     const contato = document.getElementById('editSupplierContact').value.trim();
@@ -2740,38 +2779,47 @@ function editSupplier(id){
       showToast('Preencha o nome do fornecedor');
       return false;
     }
-    supplier.nome = nome;
-    supplier.contato = contato;
-    saveSuppliers(suppliers);
+    try{
+      const {error} = await sb.from('suppliers').update(supplierToDb({nome, contato})).eq('id', id);
+      if(error) throw error;
+      supplier.nome = nome;
+      supplier.contato = contato;
+    }catch(e){ showToast('Erro ao salvar: ' + e.message); return false; }
+    renderSuppliers();
+    updateSupplierSelect();
+    refreshOpenSupplierParts();
     showToast('Fornecedor atualizado');
   });
 }
 
-function deleteSupplier(id){
+async function deleteSupplier(id){
   if(!confirm('Tem certeza? Isso também removerá as peças cadastradas para este fornecedor.')) return;
-  let suppliers = getSuppliers();
-  let parts = getParts();
-  suppliers = suppliers.filter(s=>s.id!==id);
-  parts = parts.filter(p=>p.supplierId!==id);
-  saveParts(parts);
-  saveSuppliers(suppliers);
-  showToast('Fornecedor removido');
+  try{
+    const {error} = await sb.from('suppliers').delete().eq('id', id);
+    if(error) throw error;
+    state.suppliers = state.suppliers.filter(s=>s.id!==id);
+    state.supplierParts = state.supplierParts.filter(p=>p.supplierId!==id);
+    if(currentOpenSupplierId===id){
+      currentOpenSupplierId = null;
+      document.getElementById('supplierPartsBox').style.display = 'none';
+    }
+    renderSuppliers();
+    updateSupplierSelect();
+    showToast('Fornecedor removido');
+  }catch(e){ showToast('Erro ao excluir: ' + e.message); }
 }
 
 function addPart(){
-  const suppliers = getSuppliers();
+  const suppliers = state.suppliers;
   if(suppliers.length === 0){
     showToast('Cadastre um fornecedor primeiro');
     return;
   }
-  
-  const parts = getParts();
-  const newId = Math.max(...parts.map(p=>p.id), 0) + 1;
-  
+
   const modalBody = document.getElementById('modalBody');
   const modalTitle = document.getElementById('modalTitle');
   modalTitle.textContent = 'Adicionar Peça';
-  
+
   modalBody.innerHTML = `
     <div class="field">
       <label>Nome da peça</label>
@@ -2780,7 +2828,7 @@ function addPart(){
     <div class="field">
       <label>Fornecedor</label>
       <select id="newPartSupplier">
-        ${suppliers.map(s=>`<option value="${s.id}">${esc(s.nome)}</option>`).join('')}
+        ${suppliers.map(s=>`<option value="${s.id}" ${s.id===currentOpenSupplierId?'selected':''}>${esc(s.nome)}</option>`).join('')}
       </select>
     </div>
     <div class="field">
@@ -2788,37 +2836,39 @@ function addPart(){
       <input type="number" id="newPartPrice" step="0.01" min="0" placeholder="0.00">
     </div>
   `;
-  
+
   setTimeout(()=> document.getElementById('newPartName').focus(), 100);
-  
+
   openModal(async ()=>{
     const nome = document.getElementById('newPartName').value.trim();
-    const supplierId = parseInt(document.getElementById('newPartSupplier').value);
+    const supplierId = document.getElementById('newPartSupplier').value;
     const preco = parseFloat(document.getElementById('newPartPrice').value);
-    
-    if(!nome || isNaN(supplierId) || isNaN(preco) || preco<0){
+
+    if(!nome || !supplierId || isNaN(preco) || preco<0){
       showToast('Preencha todos os campos corretamente');
       return false;
     }
-    
-    parts.push({id:newId, nome, supplierId, preco});
-    saveParts(parts);
+    try{
+      const payload = Object.assign(partToDb({nome, supplierId, preco}), {user_id: currentUser.id});
+      const {data, error} = await sb.from('supplier_parts').insert(payload).select().single();
+      if(error) throw error;
+      state.supplierParts.push(partFromDb(data));
+    }catch(e){ showToast('Erro ao salvar: ' + e.message); return false; }
     renderSuppliers();
+    refreshOpenSupplierParts();
     showToast('Peça adicionada');
   });
 }
 
 function editPart(partId, supplierId){
-  const parts = getParts();
-  const suppliers = getSuppliers();
-  const part = parts.find(p => p.id === partId);
-  
+  const part = state.supplierParts.find(p => p.id === partId);
+  const suppliers = state.suppliers;
   if(!part) return;
-  
+
   const modalBody = document.getElementById('modalBody');
   const modalTitle = document.getElementById('modalTitle');
   modalTitle.textContent = 'Editar Peça';
-  
+
   modalBody.innerHTML = `
     <div class="field">
       <label>Nome da peça</label>
@@ -2835,58 +2885,60 @@ function editPart(partId, supplierId){
       <input type="number" id="editPartPrice" step="0.01" min="0" value="${part.preco.toFixed(2)}">
     </div>
   `;
-  
+
   openModal(async ()=>{
     const nome = document.getElementById('editPartName').value.trim();
-    const newSupplierId = parseInt(document.getElementById('editPartSupplier').value);
+    const newSupplierId = document.getElementById('editPartSupplier').value;
     const preco = parseFloat(document.getElementById('editPartPrice').value);
-    
-    if(!nome || isNaN(newSupplierId) || isNaN(preco) || preco<0){
+
+    if(!nome || !newSupplierId || isNaN(preco) || preco<0){
       showToast('Preencha todos os campos corretamente');
       return false;
     }
-    
-    part.nome = nome;
-    part.supplierId = newSupplierId;
-    part.preco = preco;
-    saveParts(parts);
+    try{
+      const {error} = await sb.from('supplier_parts').update(partToDb({nome, supplierId:newSupplierId, preco})).eq('id', partId);
+      if(error) throw error;
+      part.nome = nome;
+      part.supplierId = newSupplierId;
+      part.preco = preco;
+    }catch(e){ showToast('Erro ao salvar: ' + e.message); return false; }
     renderSuppliers();
+    refreshOpenSupplierParts();
     showToast('Peça atualizada');
   });
 }
 
-function deletePart(partId){
+async function deletePart(partId){
   if(!confirm('Tem certeza que deseja deletar esta peça?')) return;
-  let parts = getParts();
-  parts = parts.filter(p => p.id !== partId);
-  saveParts(parts);
-  renderSuppliers();
-  showToast('Peça removida');
+  try{
+    const {error} = await sb.from('supplier_parts').delete().eq('id', partId);
+    if(error) throw error;
+    state.supplierParts = state.supplierParts.filter(p => p.id !== partId);
+    refreshOpenSupplierParts();
+    showToast('Peça removida');
+  }catch(e){ showToast('Erro ao excluir: ' + e.message); }
 }
 
 function searchPrice(){
   const partName = document.getElementById('searchPart').value.trim().toLowerCase();
-  const supplierId = parseInt(document.getElementById('selectSupplier').value);
-  
+  const supplierId = document.getElementById('selectSupplier').value;
+
   if(!partName || !supplierId){
     showToast('Preencha o nome da peça e selecione um fornecedor');
     return;
   }
-  
-  const parts = getParts();
-  const suppliers = getSuppliers();
-  
-  const part = parts.find(p => p.nome.toLowerCase().includes(partName) && p.supplierId === supplierId);
-  const supplier = suppliers.find(s => s.id === supplierId);
-  
+
+  const part = state.supplierParts.find(p => p.nome.toLowerCase().includes(partName) && p.supplierId === supplierId);
+  const supplier = state.suppliers.find(s => s.id === supplierId);
+
   if(!part){
     showToast('Peça não encontrada para este fornecedor');
     return;
   }
-  
+
   const margin = parseFloat(document.getElementById('marginProfit').value) || 30;
   const finalPrice = part.preco * (1 + margin/100);
-  
+
   document.getElementById('resultPart').textContent = esc(part.nome);
   document.getElementById('resultSupplier').textContent = esc(supplier.nome);
   document.getElementById('resultCost').textContent = fmt(part.preco);
@@ -2900,6 +2952,7 @@ document.getElementById('btnAddPart').addEventListener('click', addPart);
 document.getElementById('btnSearchPrice').addEventListener('click', searchPrice);
 document.getElementById('btnCloseSupplierParts').addEventListener('click', ()=>{
   document.getElementById('supplierPartsBox').style.display = 'none';
+  currentOpenSupplierId = null;
 });
 
 document.getElementById('searchPart').addEventListener('keypress', e=>{
@@ -2919,17 +2972,18 @@ document.getElementById('marginProfit').addEventListener('change', ()=>{
 document.getElementById('suppliersList').addEventListener('click', e=>{
   const edit = e.target.closest('[data-edit-supplier]');
   const del = e.target.closest('[data-delete-supplier]');
-  if(edit) editSupplier(parseInt(edit.dataset.editSupplier));
-  if(del) deleteSupplier(parseInt(del.dataset.deleteSupplier));
+  if(edit) editSupplier(edit.dataset.editSupplier);
+  if(del) deleteSupplier(del.dataset.deleteSupplier);
 });
 
-// Event listener para editar/deletar peças da tabela do fornecedor
-document.addEventListener('click', e=>{
-  const edit = e.target.closest('#supplierPartsTable [data-edit-part]');
-  const del = e.target.closest('#supplierPartsTable [data-delete-part]');
-  if(edit) editPart(parseInt(edit.dataset.editPart), parseInt(edit.dataset.supplierId));
-  if(del) deletePart(parseInt(del.dataset.deletePart));
+// Listener delegado (único) para editar/deletar peças da tabela do fornecedor aberto
+document.getElementById('supplierPartsTable').addEventListener('click', e=>{
+  const edit = e.target.closest('[data-edit-part]');
+  const del = e.target.closest('[data-delete-part]');
+  if(edit) editPart(edit.dataset.editPart, edit.dataset.supplierId);
+  if(del) deletePart(del.dataset.deletePart);
 });
+
 
 /* ============================= MODAL GENERIC ============================= */
 let currentSaveHandler = null;
