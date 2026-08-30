@@ -434,8 +434,13 @@ tbody tr:hover{background:var(--surface-2);}
       <div class="field full" style="margin-bottom:10px;"><label>Nome da assistência técnica</label><input id="authEmpresa" type="text" placeholder="Ex: TekTech Assistência" autocomplete="organization"></div>
       <div class="field full" style="margin-bottom:10px;"><label>Telefone</label><input id="authTelefone" type="tel" placeholder="(00) 00000-0000" autocomplete="tel"></div>
     </div>
-    <div class="field full" style="margin-bottom:10px;"><label>E-mail</label><input id="authEmail" type="email" placeholder="seu@email.com" autocomplete="email"></div>
-    <div class="field full" style="margin-bottom:14px;"><label>Senha</label><input id="authPassword" type="password" placeholder="Mínimo 6 caracteres" autocomplete="current-password"></div>
+    <div class="field full" id="authEmailWrap" style="margin-bottom:10px;"><label>E-mail</label><input id="authEmail" type="email" placeholder="seu@email.com" autocomplete="email"></div>
+    <div class="field full" id="authPasswordWrap" style="margin-bottom:6px;"><label>Senha</label><input id="authPassword" type="password" placeholder="Mínimo 6 caracteres" autocomplete="current-password"></div>
+    <div id="authForgotWrap" style="text-align:right; margin-bottom:14px;">
+      <a id="authForgotLink" style="font-size:12px; color:var(--copper-dark); cursor:pointer; text-decoration:underline;">Esqueci minha senha</a>
+    </div>
+    <div class="field full" id="authNewPasswordWrap" style="display:none; margin-bottom:10px;"><label>Nova senha</label><input id="authNewPassword" type="password" placeholder="Mínimo 6 caracteres" autocomplete="new-password"></div>
+    <div class="field full" id="authNewPasswordConfirmWrap" style="display:none; margin-bottom:14px;"><label>Confirmar nova senha</label><input id="authNewPasswordConfirm" type="password" placeholder="Repita a senha" autocomplete="new-password"></div>
     <button class="btn btn-primary" id="authSubmitBtn" style="width:100%; justify-content:center;">Entrar</button>
     <div class="auth-switch"><span id="authSwitchText">Ainda não tem conta?</span> <a id="authSwitchLink">Criar conta</a></div>
     <div class="auth-hint">Teste grátis por 7 dias. Depois, R$ 39,99/mês.</div>
@@ -573,6 +578,29 @@ tbody tr:hover{background:var(--surface-2);}
 
       <!-- ORDENS DE SERVIÇO -->
       <section class="view" id="view-orders">
+        <div class="toolbar">
+          <div class="field">
+            <label>Mês de referência</label>
+            <input type="month" id="ordersMonth">
+          </div>
+        </div>
+        <div class="kpi-row" style="grid-template-columns:repeat(3,1fr);">
+          <div class="kpi k-revenue">
+            <div class="kpi-label">Faturamento de serviços</div>
+            <div class="kpi-value num" id="ordersKpiRevenue">R$ 0,00</div>
+            <div class="kpi-note">Ordens de serviço pagas no mês</div>
+          </div>
+          <div class="kpi k-cost">
+            <div class="kpi-label">Custo de peças</div>
+            <div class="kpi-value num" id="ordersKpiCost">R$ 0,00</div>
+            <div class="kpi-note">Peças usadas nos reparos pagos</div>
+          </div>
+          <div class="kpi k-profit">
+            <div class="kpi-label">Lucro de serviços</div>
+            <div class="kpi-value num" id="ordersKpiProfit">R$ 0,00</div>
+            <div class="kpi-note" id="ordersKpiMargin">Margem: 0%</div>
+          </div>
+        </div>
         <div class="toolbar">
           <div class="field">
             <label>Buscar</label>
@@ -1015,14 +1043,40 @@ function showAuthScreen(){ document.getElementById('authScreen').style.display='
 function showApp(){ document.getElementById('authScreen').style.display='none'; document.getElementById('app').style.display='flex'; }
 
 function updateAuthUI(){
-  document.getElementById('authSubmitBtn').textContent = authMode==='login' ? 'Entrar' : 'Criar conta';
-  document.getElementById('authSwitchText').textContent = authMode==='login' ? 'Ainda não tem conta?' : 'Já tem conta?';
-  document.getElementById('authSwitchLink').textContent = authMode==='login' ? 'Criar conta' : 'Entrar';
-  document.getElementById('authSignupFields').style.display = authMode==='login' ? 'none' : 'block';
+  const emailWrap = document.getElementById('authEmailWrap');
+  const passWrap = document.getElementById('authPasswordWrap');
+  const forgotWrap = document.getElementById('authForgotWrap');
+  const newPassWrap = document.getElementById('authNewPasswordWrap');
+  const newPassConfirmWrap = document.getElementById('authNewPasswordConfirmWrap');
+  const submitBtn = document.getElementById('authSubmitBtn');
+  const switchText = document.getElementById('authSwitchText');
+  const switchLink = document.getElementById('authSwitchLink');
+
+  document.getElementById('authSignupFields').style.display = authMode==='signup' ? 'block' : 'none';
+  emailWrap.style.display = (authMode==='reset') ? 'none' : '';
+  passWrap.style.display = (authMode==='login' || authMode==='signup') ? '' : 'none';
+  forgotWrap.style.display = authMode==='login' ? 'block' : 'none';
+  newPassWrap.style.display = authMode==='reset' ? '' : 'none';
+  newPassConfirmWrap.style.display = authMode==='reset' ? '' : 'none';
+
+  if(authMode==='login'){
+    submitBtn.textContent = 'Entrar'; switchText.textContent = 'Ainda não tem conta?'; switchLink.textContent = 'Criar conta'; switchLink.style.display='';
+  } else if(authMode==='signup'){
+    submitBtn.textContent = 'Criar conta'; switchText.textContent = 'Já tem conta?'; switchLink.textContent = 'Entrar'; switchLink.style.display='';
+  } else if(authMode==='recover'){
+    submitBtn.textContent = 'Enviar link de redefinição'; switchText.textContent = ''; switchLink.textContent = 'Voltar para login'; switchLink.style.display='';
+  } else if(authMode==='reset'){
+    submitBtn.textContent = 'Salvar nova senha'; switchText.textContent = ''; switchLink.style.display='none';
+  }
   document.getElementById('authError').style.display='none';
 }
 document.getElementById('authSwitchLink').addEventListener('click', e=>{
-  e.preventDefault(); authMode = authMode==='login' ? 'signup' : 'login'; updateAuthUI();
+  e.preventDefault();
+  authMode = (authMode==='recover') ? 'login' : (authMode==='login' ? 'signup' : 'login');
+  updateAuthUI();
+});
+document.getElementById('authForgotLink').addEventListener('click', ()=>{
+  authMode = 'recover'; updateAuthUI();
 });
 
 function translateAuthError(msg){
@@ -1030,20 +1084,58 @@ function translateAuthError(msg){
   if(/already registered|already exists/i.test(msg)) return 'Este e-mail já está cadastrado. Tente entrar.';
   if(/Password should be|at least 6/i.test(msg)) return 'A senha precisa ter pelo menos 6 caracteres.';
   if(/Unable to validate email/i.test(msg)) return 'E-mail inválido.';
+  if(/rate limit/i.test(msg)) return 'Muitas tentativas. Aguarde um pouco antes de tentar de novo.';
   return msg;
 }
 
 document.getElementById('authSubmitBtn').addEventListener('click', async ()=>{
-  const email = document.getElementById('authEmail').value.trim();
-  const password = document.getElementById('authPassword').value;
   const errEl = document.getElementById('authError');
   errEl.style.display='none';
+  const btn = document.getElementById('authSubmitBtn');
+  const oldTxt = btn.textContent;
+
+  if(authMode==='reset'){
+    const newPass = document.getElementById('authNewPassword').value;
+    const confirmPass = document.getElementById('authNewPasswordConfirm').value;
+    if(!newPass || newPass.length<6){ errEl.style.color='var(--red)'; errEl.textContent='A senha precisa ter pelo menos 6 caracteres.'; errEl.style.display='block'; return; }
+    if(newPass!==confirmPass){ errEl.style.color='var(--red)'; errEl.textContent='As senhas não coincidem.'; errEl.style.display='block'; return; }
+    btn.disabled = true; btn.textContent = 'Aguarde...';
+    try{
+      const {data, error} = await sb.auth.updateUser({password:newPass});
+      if(error) throw error;
+      document.getElementById('authNewPassword').value = '';
+      document.getElementById('authNewPasswordConfirm').value = '';
+      authMode = 'login';
+      showToast('Senha atualizada com sucesso!');
+      await onAuthed(data.user);
+    }catch(e){ errEl.style.color='var(--red)'; errEl.textContent = translateAuthError(e.message); errEl.style.display='block'; }
+    btn.disabled = false; btn.textContent = oldTxt;
+    return;
+  }
+
+  if(authMode==='recover'){
+    const email = document.getElementById('authEmail').value.trim();
+    if(!email){ errEl.style.color='var(--red)'; errEl.textContent='Informe seu e-mail'; errEl.style.display='block'; return; }
+    btn.disabled = true; btn.textContent = 'Aguarde...';
+    try{
+      const redirectTo = window.location.origin + window.location.pathname;
+      const {error} = await sb.auth.resetPasswordForEmail(email, {redirectTo});
+      if(error) throw error;
+      errEl.style.color='var(--teal)';
+      errEl.textContent = 'Link de redefinição enviado! Verifique seu e-mail.';
+      errEl.style.display='block';
+    }catch(e){ errEl.style.color='var(--red)'; errEl.textContent = translateAuthError(e.message); errEl.style.display='block'; }
+    btn.disabled = false; btn.textContent = oldTxt;
+    return;
+  }
+
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
   if(!email || !password){ errEl.style.color='var(--red)'; errEl.textContent='Preencha e-mail e senha'; errEl.style.display='block'; return; }
   if(authMode==='signup' && !document.getElementById('authNome').value.trim()){
     errEl.style.color='var(--red)'; errEl.textContent='Informe seu nome completo'; errEl.style.display='block'; return;
   }
-  const btn = document.getElementById('authSubmitBtn');
-  const oldTxt = btn.textContent; btn.disabled = true; btn.textContent = 'Aguarde...';
+  btn.disabled = true; btn.textContent = 'Aguarde...';
   try{
     let result;
     if(authMode==='login'){
@@ -1354,7 +1446,32 @@ document.getElementById('orderSearch').addEventListener('input', renderOrders);
 document.getElementById('orderStatusFilter').addEventListener('change', renderOrders);
 document.getElementById('btnNewOrder').addEventListener('click', ()=>openOrderModal());
 
+const ordersMonthInput = document.getElementById('ordersMonth');
+ordersMonthInput.value = monthISO();
+ordersMonthInput.addEventListener('change', renderOrdersKpis);
+
+function renderOrdersKpis(){
+  const month = ordersMonthInput.value || monthISO();
+  const [from,to] = monthRange(month);
+  let revenue=0, cost=0;
+  state.orders.forEach(o=>{
+    if(o.pago && inRange(o.dataPagamento, from, to)){
+      revenue += orderRevenue(o);
+      cost += orderCost(o);
+    }
+  });
+  const profit = revenue - cost;
+  document.getElementById('ordersKpiRevenue').textContent = fmt(revenue);
+  document.getElementById('ordersKpiCost').textContent = fmt(cost);
+  const profitEl = document.getElementById('ordersKpiProfit');
+  profitEl.textContent = fmt(profit);
+  profitEl.style.color = profit<0 ? 'var(--red)' : 'var(--ink)';
+  const margin = revenue>0 ? (profit/revenue*100) : 0;
+  document.getElementById('ordersKpiMargin').textContent = `Margem: ${margin.toFixed(1)}%`;
+}
+
 function renderOrders(){
+  renderOrdersKpis();
   const q = (document.getElementById('orderSearch').value||'').toLowerCase();
   const statusF = document.getElementById('orderStatusFilter').value;
   let list = state.orders.slice().sort((a,b)=> (a.dataAbertura||'')<(b.dataAbertura||'') ? 1 : -1);
