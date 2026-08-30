@@ -757,6 +757,31 @@ tbody tr:hover{background:var(--surface-2);}
               <div class="empty-title">Nenhum fornecedor cadastrado</div>
               <div>Clique em "Novo fornecedor" para começar</div>
             </div>
+
+            <!-- Tabela de peças do fornecedor selecionado -->
+            <div id="supplierPartsBox" style="display:none; margin-top:20px; padding-top:20px; border-top:1px solid var(--line);">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <div class="panel-title" style="margin:0;">Peças de <span id="selectedSupplierName" style="color:var(--copper);"></span></div>
+                <button class="icon-btn" id="btnCloseSupplierParts" title="Fechar">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
+              </div>
+              <div class="table-scroll" style="max-height:300px;">
+                <table id="supplierPartsTable">
+                  <thead>
+                    <tr>
+                      <th style="width:60%">Peça</th>
+                      <th style="width:30%" class="right">Preço</th>
+                      <th style="width:10%" class="center">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody id="supplierPartsBody"></tbody>
+                </table>
+              </div>
+              <div class="empty" id="supplierPartsEmpty" style="display:none; margin-top:12px;">
+                <div class="empty-title" style="font-size:13px;">Nenhuma peça cadastrada</div>
+              </div>
+            </div>
           </div>
 
           <!-- Painel de Consulta -->
@@ -2576,12 +2601,12 @@ function renderSuppliers(){
   
   empty.style.display = 'none';
   list.innerHTML = suppliers.map(s=>`
-    <div style="padding:12px; background:var(--surface-2); border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
-      <div>
+    <div style="padding:12px; background:var(--surface-2); border-radius:8px; display:flex; justify-content:space-between; align-items:center; cursor:pointer; transition:background .12s;" class="supplier-item" data-supplier-id="${s.id}" data-supplier-name="${esc(s.nome)}">
+      <div style="flex:1;">
         <div style="font-weight:600;">${esc(s.nome)}</div>
         <div style="font-size:12px; color:var(--muted);">${esc(s.contato || '—')}</div>
       </div>
-      <div class="t-actions">
+      <div class="t-actions" onclick="event.stopPropagation();">
         <button class="icon-btn" title="Editar" data-edit-supplier="${s.id}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         </button>
@@ -2591,6 +2616,18 @@ function renderSuppliers(){
       </div>
     </div>
   `).join('');
+  
+  // Adicionar evento de clique no fornecedor
+  document.querySelectorAll('.supplier-item').forEach(item=>{
+    item.addEventListener('click', ()=>{
+      const supplierId = parseInt(item.dataset.supplierId);
+      const supplierName = item.dataset.supplierName;
+      showSupplierParts(supplierId, supplierName);
+    });
+    // Highlight ao hover
+    item.addEventListener('mouseenter', ()=> item.style.background = 'var(--surface)');
+    item.addEventListener('mouseleave', ()=> item.style.background = 'var(--surface-2)');
+  });
 }
 
 function updateSupplierSelect(){
@@ -2602,6 +2639,44 @@ function updateSupplierSelect(){
     suppliers.map(s=>`<option value="${s.id}">${esc(s.nome)}</option>`).join('');
   
   select.value = currentValue;
+}
+
+function showSupplierParts(supplierId, supplierName){
+  const parts = getParts();
+  const supplierParts = parts.filter(p => p.supplierId === supplierId);
+  
+  document.getElementById('selectedSupplierName').textContent = supplierName;
+  
+  if(supplierParts.length === 0){
+    document.getElementById('supplierPartsEmpty').style.display = 'block';
+    document.getElementById('supplierPartsBody').innerHTML = '';
+  } else {
+    document.getElementById('supplierPartsEmpty').style.display = 'none';
+    document.getElementById('supplierPartsBody').innerHTML = supplierParts.map(p=>`
+      <tr>
+        <td>${esc(p.nome)}</td>
+        <td class="right num">${fmt(p.preco)}</td>
+        <td class="center t-actions">
+          <button class="icon-btn" title="Editar" data-edit-part="${p.id}" data-supplier-id="${supplierId}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button class="icon-btn btn-danger" title="Deletar" data-delete-part="${p.id}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>
+          </button>
+        </td>
+      </tr>
+    `).join('');
+  }
+  
+  document.getElementById('supplierPartsBox').style.display = 'block';
+  
+  // Eventos para editar/deletar peças
+  document.getElementById('supplierPartsTable').addEventListener('click', e=>{
+    const edit = e.target.closest('[data-edit-part]');
+    const del = e.target.closest('[data-delete-part]');
+    if(edit) editPart(parseInt(edit.dataset.editPart), parseInt(edit.dataset.supplierId));
+    if(del) deletePart(parseInt(del.dataset.deletePart));
+  });
 }
 
 function addSupplier(){
@@ -2728,8 +2803,65 @@ function addPart(){
     
     parts.push({id:newId, nome, supplierId, preco});
     saveParts(parts);
+    renderSuppliers();
     showToast('Peça adicionada');
   });
+}
+
+function editPart(partId, supplierId){
+  const parts = getParts();
+  const suppliers = getSuppliers();
+  const part = parts.find(p => p.id === partId);
+  
+  if(!part) return;
+  
+  const modalBody = document.getElementById('modalBody');
+  const modalTitle = document.getElementById('modalTitle');
+  modalTitle.textContent = 'Editar Peça';
+  
+  modalBody.innerHTML = `
+    <div class="field">
+      <label>Nome da peça</label>
+      <input type="text" id="editPartName" value="${esc(part.nome)}">
+    </div>
+    <div class="field">
+      <label>Fornecedor</label>
+      <select id="editPartSupplier">
+        ${suppliers.map(s=>`<option value="${s.id}" ${s.id === supplierId ? 'selected' : ''}>${esc(s.nome)}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field">
+      <label>Preço da peça (R$)</label>
+      <input type="number" id="editPartPrice" step="0.01" min="0" value="${part.preco.toFixed(2)}">
+    </div>
+  `;
+  
+  openModal(async ()=>{
+    const nome = document.getElementById('editPartName').value.trim();
+    const newSupplierId = parseInt(document.getElementById('editPartSupplier').value);
+    const preco = parseFloat(document.getElementById('editPartPrice').value);
+    
+    if(!nome || isNaN(newSupplierId) || isNaN(preco) || preco<0){
+      showToast('Preencha todos os campos corretamente');
+      return false;
+    }
+    
+    part.nome = nome;
+    part.supplierId = newSupplierId;
+    part.preco = preco;
+    saveParts(parts);
+    renderSuppliers();
+    showToast('Peça atualizada');
+  });
+}
+
+function deletePart(partId){
+  if(!confirm('Tem certeza que deseja deletar esta peça?')) return;
+  let parts = getParts();
+  parts = parts.filter(p => p.id !== partId);
+  saveParts(parts);
+  renderSuppliers();
+  showToast('Peça removida');
 }
 
 function searchPrice(){
@@ -2766,6 +2898,9 @@ function searchPrice(){
 document.getElementById('btnAddSupplier').addEventListener('click', addSupplier);
 document.getElementById('btnAddPart').addEventListener('click', addPart);
 document.getElementById('btnSearchPrice').addEventListener('click', searchPrice);
+document.getElementById('btnCloseSupplierParts').addEventListener('click', ()=>{
+  document.getElementById('supplierPartsBox').style.display = 'none';
+});
 
 document.getElementById('searchPart').addEventListener('keypress', e=>{
   if(e.key==='Enter') searchPrice();
@@ -2786,6 +2921,14 @@ document.getElementById('suppliersList').addEventListener('click', e=>{
   const del = e.target.closest('[data-delete-supplier]');
   if(edit) editSupplier(parseInt(edit.dataset.editSupplier));
   if(del) deleteSupplier(parseInt(del.dataset.deleteSupplier));
+});
+
+// Event listener para editar/deletar peças da tabela do fornecedor
+document.addEventListener('click', e=>{
+  const edit = e.target.closest('#supplierPartsTable [data-edit-part]');
+  const del = e.target.closest('#supplierPartsTable [data-delete-part]');
+  if(edit) editPart(parseInt(edit.dataset.editPart), parseInt(edit.dataset.supplierId));
+  if(del) deletePart(parseInt(del.dataset.deletePart));
 });
 
 /* ============================= MODAL GENERIC ============================= */
