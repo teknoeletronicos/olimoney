@@ -789,6 +789,15 @@ tbody tr:hover{background:var(--surface-2);}
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
                 </button>
               </div>
+              <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
+                <input type="text" id="supplierPartsSearch" placeholder="Buscar peça..." style="flex:1; min-width:160px;">
+                <select id="supplierPartsSort" style="flex:0 0 auto;">
+                  <option value="nome_asc">Nome (A-Z)</option>
+                  <option value="nome_desc">Nome (Z-A)</option>
+                  <option value="preco_asc">Menor preço</option>
+                  <option value="preco_desc">Maior preço</option>
+                </select>
+              </div>
               <div class="table-scroll" style="max-height:300px;">
                 <table id="supplierPartsTable">
                   <thead>
@@ -2682,12 +2691,32 @@ function updateSupplierSelect(){
 
 function showSupplierParts(supplierId, supplierName){
   currentOpenSupplierId = supplierId;
-  const supplierParts = state.supplierParts.filter(p => p.supplierId === supplierId);
-
   document.getElementById('selectedSupplierName').textContent = supplierName;
+  document.getElementById('supplierPartsBox').style.display = 'block';
+  renderSupplierPartsFiltered();
+}
+
+function renderSupplierPartsFiltered(){
+  if(!currentOpenSupplierId) return;
+  const supplierId = currentOpenSupplierId;
+  const query = (document.getElementById('supplierPartsSearch').value||'').trim().toLowerCase();
+  const sortBy = document.getElementById('supplierPartsSort').value;
+
+  let supplierParts = state.supplierParts.filter(p => p.supplierId === supplierId);
+  if(query) supplierParts = supplierParts.filter(p => p.nome.toLowerCase().includes(query));
+
+  supplierParts = supplierParts.slice().sort((a,b)=>{
+    if(sortBy==='nome_asc') return a.nome.localeCompare(b.nome);
+    if(sortBy==='nome_desc') return b.nome.localeCompare(a.nome);
+    if(sortBy==='preco_asc') return a.preco - b.preco;
+    if(sortBy==='preco_desc') return b.preco - a.preco;
+    return 0;
+  });
 
   if(supplierParts.length === 0){
     document.getElementById('supplierPartsEmpty').style.display = 'block';
+    document.getElementById('supplierPartsEmpty').querySelector('.empty-title').textContent =
+      query ? 'Nenhuma peça encontrada para essa busca' : 'Nenhuma peça cadastrada';
     document.getElementById('supplierPartsBody').innerHTML = '';
   } else {
     document.getElementById('supplierPartsEmpty').style.display = 'none';
@@ -2706,8 +2735,6 @@ function showSupplierParts(supplierId, supplierName){
       </tr>
     `).join('');
   }
-
-  document.getElementById('supplierPartsBox').style.display = 'block';
 }
 
 function refreshOpenSupplierParts(){
@@ -2954,6 +2981,8 @@ document.getElementById('btnCloseSupplierParts').addEventListener('click', ()=>{
   document.getElementById('supplierPartsBox').style.display = 'none';
   currentOpenSupplierId = null;
 });
+document.getElementById('supplierPartsSearch').addEventListener('input', renderSupplierPartsFiltered);
+document.getElementById('supplierPartsSort').addEventListener('change', renderSupplierPartsFiltered);
 
 document.getElementById('searchPart').addEventListener('keypress', e=>{
   if(e.key==='Enter') searchPrice();
