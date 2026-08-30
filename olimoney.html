@@ -728,34 +728,74 @@ tbody tr:hover{background:var(--surface-2);}
         </div>
       </section>
 
-      <!-- TABELA DE PREÇOS -->
+      <!-- SISTEMA DE FORNECEDORES -->
       <section class="view" id="view-prices">
         <div class="toolbar">
-          <h2 style="margin:0; font-size:18px; font-weight:600;">Tabela de Preços de Serviços e Peças</h2>
+          <div style="display:flex; gap:12px;">
+            <button class="btn btn-primary" id="btnAddSupplier">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+              Novo fornecedor
+            </button>
+            <button class="btn btn-primary" id="btnAddPart">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+              Adicionar peça
+            </button>
+          </div>
           <div style="flex:1"></div>
-          <button class="btn btn-primary" id="btnAddPrice">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-            Adicionar item
-          </button>
+          <div class="field" style="min-width:200px;">
+            <label>Margem de lucro (%)</label>
+            <input type="number" id="marginProfit" min="0" max="999" step="1" value="30">
+          </div>
         </div>
 
-        <div class="panel" style="padding:0;">
-          <div class="table-scroll">
-            <table id="pricesTable">
-              <thead>
-                <tr>
-                  <th style="width:50%">Serviço/Peça</th>
-                  <th style="width:30%" class="right">Preço</th>
-                  <th style="width:20%" class="center">Ações</th>
-                </tr>
-              </thead>
-              <tbody id="pricesTableBody">
-              </tbody>
-            </table>
+        <div class="two-col">
+          <!-- Painel de Fornecedores -->
+          <div class="panel">
+            <div class="panel-title">Fornecedores Cadastrados</div>
+            <div id="suppliersList" style="display:flex; flex-direction:column; gap:8px;"></div>
+            <div class="empty" id="suppliersEmpty">
+              <div class="empty-title">Nenhum fornecedor cadastrado</div>
+              <div>Clique em "Novo fornecedor" para começar</div>
+            </div>
           </div>
-          <div class="empty" id="pricesEmpty" style="display:none;">
-            <div class="empty-title">Nenhum item cadastrado</div>
-            <div>Clique em "Adicionar item" para começar.</div>
+
+          <!-- Painel de Consulta -->
+          <div class="panel">
+            <div class="panel-title">Consultar Preço</div>
+            <div class="field">
+              <label>Nome da peça</label>
+              <input type="text" id="searchPart" placeholder="Ex: Tela iPhone 11">
+            </div>
+            <div class="field">
+              <label>Fornecedor</label>
+              <select id="selectSupplier">
+                <option value="">Selecione um fornecedor</option>
+              </select>
+            </div>
+            <button class="btn btn-primary" id="btnSearchPrice">Buscar</button>
+            
+            <div id="resultBox" style="display:none; margin-top:20px; padding:16px; background:var(--surface-2); border-radius:8px;">
+              <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
+                <span style="color:var(--muted);">Peça:</span>
+                <span id="resultPart" style="font-weight:600;"></span>
+              </div>
+              <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
+                <span style="color:var(--muted);">Fornecedor:</span>
+                <span id="resultSupplier" style="font-weight:600;"></span>
+              </div>
+              <div style="display:flex; justify-content:space-between; margin-bottom:16px; padding-bottom:16px; border-bottom:1px solid var(--line);">
+                <span style="color:var(--muted);">Custo (peça):</span>
+                <span id="resultCost" class="num" style="font-weight:600; font-size:16px;"></span>
+              </div>
+              <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
+                <span style="color:var(--muted);">Margem:</span>
+                <span id="resultMargin" class="num" style="font-weight:600;"></span>
+              </div>
+              <div style="display:flex; justify-content:space-between;">
+                <span style="color:var(--teal); font-weight:600;">Orçamento para cliente:</span>
+                <span id="resultPrice" class="num" style="font-weight:700; font-size:18px; color:var(--teal);"></span>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -1145,7 +1185,7 @@ const titles = {
   stock:["Estoque","Produtos, peças e preços"],
   expenses:["Gastos","Despesas operacionais do negócio"],
   history:["Histórico","Todas as movimentações financeiras"],
-  prices:["Tabela de Preços","Gerencie os preços de serviços e peças"]
+  prices:["Orçamento por Fornecedor","Consulte preços de peças e calcule orçamentos"]
 };
 
 function setView(v){
@@ -1162,7 +1202,7 @@ function setView(v){
   if(v==='stock') renderStock();
   if(v==='expenses') renderExpenses();
   if(v==='history') renderHistory();
-  if(v==='prices') renderPrices();
+  if(v==='prices'){ renderSuppliers(); updateSupplierSelect(); }
   window.scrollTo(0,0);
 }
 document.getElementById('navlist').addEventListener('click', e=>{
@@ -2502,142 +2542,250 @@ function exportCsv(){
   showToast('CSV exportado');
 }
 
-/* ============================= TABELA DE PREÇOS ============================= */
-const DEFAULT_PRICES = [
-  {id:1, nome:'Tela', preco:150.00},
-  {id:2, nome:'Bateria', preco:80.00},
-  {id:3, nome:'Carregador', preco:45.00},
-  {id:4, nome:'Cabo USB', preco:25.00},
-  {id:5, nome:'Conector de carga', preco:35.00},
-  {id:6, nome:'Botão de power', preco:30.00},
-  {id:7, nome:'Botão de volume', preco:25.00},
-  {id:8, nome:'Fone de ouvido', preco:60.00},
-];
-
-function getPrices(){
-  const stored = localStorage.getItem('olimoney_prices');
-  if(stored) return JSON.parse(stored);
-  return DEFAULT_PRICES;
+/* ============================= SISTEMA DE FORNECEDORES ============================= */
+function getSuppliers(){
+  const stored = localStorage.getItem('olimoney_suppliers');
+  return stored ? JSON.parse(stored) : [];
 }
 
-function savePrices(prices){
-  localStorage.setItem('olimoney_prices', JSON.stringify(prices));
+function getParts(){
+  const stored = localStorage.getItem('olimoney_parts');
+  return stored ? JSON.parse(stored) : [];
 }
 
-function renderPrices(){
-  const prices = getPrices();
-  const body = document.getElementById('pricesTableBody');
-  const empty = document.getElementById('pricesEmpty');
+function saveSuppliers(suppliers){
+  localStorage.setItem('olimoney_suppliers', JSON.stringify(suppliers));
+  renderSuppliers();
+  updateSupplierSelect();
+}
+
+function saveParts(parts){
+  localStorage.setItem('olimoney_parts', JSON.stringify(parts));
+}
+
+function renderSuppliers(){
+  const suppliers = getSuppliers();
+  const list = document.getElementById('suppliersList');
+  const empty = document.getElementById('suppliersEmpty');
   
-  if(prices.length === 0){
-    body.innerHTML = '';
+  if(suppliers.length === 0){
+    list.innerHTML = '';
     empty.style.display = 'block';
     return;
   }
   
   empty.style.display = 'none';
-  body.innerHTML = prices.map(p=>`
-    <tr>
-      <td>${esc(p.nome)}</td>
-      <td class="right num">${fmt(p.preco)}</td>
-      <td class="center t-actions">
-        <button class="icon-btn" title="Editar" data-edit-price="${p.id}">
+  list.innerHTML = suppliers.map(s=>`
+    <div style="padding:12px; background:var(--surface-2); border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <div style="font-weight:600;">${esc(s.nome)}</div>
+        <div style="font-size:12px; color:var(--muted);">${esc(s.contato || '—')}</div>
+      </div>
+      <div class="t-actions">
+        <button class="icon-btn" title="Editar" data-edit-supplier="${s.id}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         </button>
-        <button class="icon-btn btn-danger" title="Deletar" data-delete-price="${p.id}">
+        <button class="icon-btn btn-danger" title="Deletar" data-delete-supplier="${s.id}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>
         </button>
-      </td>
-    </tr>
+      </div>
+    </div>
   `).join('');
 }
 
-function editPrice(id){
-  const prices = getPrices();
-  const price = prices.find(p=>p.id===id);
-  if(!price) return;
+function updateSupplierSelect(){
+  const suppliers = getSuppliers();
+  const select = document.getElementById('selectSupplier');
+  const currentValue = select.value;
+  
+  select.innerHTML = '<option value="">Selecione um fornecedor</option>' + 
+    suppliers.map(s=>`<option value="${s.id}">${esc(s.nome)}</option>`).join('');
+  
+  select.value = currentValue;
+}
+
+function addSupplier(){
+  const suppliers = getSuppliers();
+  const newId = Math.max(...suppliers.map(s=>s.id), 0) + 1;
   
   const modalBody = document.getElementById('modalBody');
   const modalTitle = document.getElementById('modalTitle');
-  modalTitle.textContent = 'Editar Preço';
+  modalTitle.textContent = 'Novo Fornecedor';
   
   modalBody.innerHTML = `
     <div class="field">
-      <label>Nome do serviço/peça</label>
-      <input type="text" id="editPriceName" value="${esc(price.nome)}">
+      <label>Nome da empresa</label>
+      <input type="text" id="newSupplierName" placeholder="Ex: TechParts Brasil">
     </div>
     <div class="field">
-      <label>Preço (R$)</label>
-      <input type="number" id="editPriceAmount" step="0.01" min="0" value="${price.preco.toFixed(2)}">
+      <label>Contato (telefone/email/cidade)</label>
+      <input type="text" id="newSupplierContact" placeholder="Ex: (11) 9999-9999 | vendas@techparts.com.br">
+    </div>
+  `;
+  
+  setTimeout(()=> document.getElementById('newSupplierName').focus(), 100);
+  
+  openModal(async ()=>{
+    const nome = document.getElementById('newSupplierName').value.trim();
+    const contato = document.getElementById('newSupplierContact').value.trim();
+    if(!nome){
+      showToast('Preencha o nome do fornecedor');
+      return false;
+    }
+    suppliers.push({id:newId, nome, contato});
+    saveSuppliers(suppliers);
+    showToast('Fornecedor adicionado');
+  });
+}
+
+function editSupplier(id){
+  const suppliers = getSuppliers();
+  const supplier = suppliers.find(s=>s.id===id);
+  if(!supplier) return;
+  
+  const modalBody = document.getElementById('modalBody');
+  const modalTitle = document.getElementById('modalTitle');
+  modalTitle.textContent = 'Editar Fornecedor';
+  
+  modalBody.innerHTML = `
+    <div class="field">
+      <label>Nome da empresa</label>
+      <input type="text" id="editSupplierName" value="${esc(supplier.nome)}">
+    </div>
+    <div class="field">
+      <label>Contato (telefone/email/cidade)</label>
+      <input type="text" id="editSupplierContact" value="${esc(supplier.contato||'')}">
     </div>
   `;
   
   openModal(async ()=>{
-    const nome = document.getElementById('editPriceName').value.trim();
-    const preco = parseFloat(document.getElementById('editPriceAmount').value);
-    if(!nome || isNaN(preco) || preco<0){
-      showToast('Preencha todos os campos corretamente');
+    const nome = document.getElementById('editSupplierName').value.trim();
+    const contato = document.getElementById('editSupplierContact').value.trim();
+    if(!nome){
+      showToast('Preencha o nome do fornecedor');
       return false;
     }
-    price.nome = nome;
-    price.preco = preco;
-    savePrices(prices);
-    renderPrices();
-    showToast('Preço atualizado');
+    supplier.nome = nome;
+    supplier.contato = contato;
+    saveSuppliers(suppliers);
+    showToast('Fornecedor atualizado');
   });
 }
 
-function deletePrice(id){
-  if(!confirm('Tem certeza que deseja deletar este item?')) return;
-  let prices = getPrices();
-  prices = prices.filter(p=>p.id!==id);
-  savePrices(prices);
-  renderPrices();
-  showToast('Item deletado');
+function deleteSupplier(id){
+  if(!confirm('Tem certeza? Isso também removerá as peças cadastradas para este fornecedor.')) return;
+  let suppliers = getSuppliers();
+  let parts = getParts();
+  suppliers = suppliers.filter(s=>s.id!==id);
+  parts = parts.filter(p=>p.supplierId!==id);
+  saveParts(parts);
+  saveSuppliers(suppliers);
+  showToast('Fornecedor removido');
 }
 
-function addPrice(){
-  const prices = getPrices();
-  const newId = Math.max(...prices.map(p=>p.id), 0) + 1;
+function addPart(){
+  const suppliers = getSuppliers();
+  if(suppliers.length === 0){
+    showToast('Cadastre um fornecedor primeiro');
+    return;
+  }
+  
+  const parts = getParts();
+  const newId = Math.max(...parts.map(p=>p.id), 0) + 1;
   
   const modalBody = document.getElementById('modalBody');
   const modalTitle = document.getElementById('modalTitle');
-  modalTitle.textContent = 'Adicionar Item';
+  modalTitle.textContent = 'Adicionar Peça';
   
   modalBody.innerHTML = `
     <div class="field">
-      <label>Nome do serviço/peça</label>
-      <input type="text" id="newPriceName" placeholder="Ex: Tela de LCD">
+      <label>Nome da peça</label>
+      <input type="text" id="newPartName" placeholder="Ex: Tela iPhone 11">
     </div>
     <div class="field">
-      <label>Preço (R$)</label>
-      <input type="number" id="newPriceAmount" step="0.01" min="0" placeholder="0.00">
+      <label>Fornecedor</label>
+      <select id="newPartSupplier">
+        ${suppliers.map(s=>`<option value="${s.id}">${esc(s.nome)}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field">
+      <label>Preço da peça (R$)</label>
+      <input type="number" id="newPartPrice" step="0.01" min="0" placeholder="0.00">
     </div>
   `;
   
-  setTimeout(()=> document.getElementById('newPriceName').focus(), 100);
+  setTimeout(()=> document.getElementById('newPartName').focus(), 100);
   
   openModal(async ()=>{
-    const nome = document.getElementById('newPriceName').value.trim();
-    const preco = parseFloat(document.getElementById('newPriceAmount').value);
-    if(!nome || isNaN(preco) || preco<0){
+    const nome = document.getElementById('newPartName').value.trim();
+    const supplierId = parseInt(document.getElementById('newPartSupplier').value);
+    const preco = parseFloat(document.getElementById('newPartPrice').value);
+    
+    if(!nome || isNaN(supplierId) || isNaN(preco) || preco<0){
       showToast('Preencha todos os campos corretamente');
       return false;
     }
-    prices.push({id:newId, nome, preco});
-    savePrices(prices);
-    renderPrices();
-    showToast('Item adicionado');
+    
+    parts.push({id:newId, nome, supplierId, preco});
+    saveParts(parts);
+    showToast('Peça adicionada');
   });
 }
 
-document.getElementById('btnAddPrice').addEventListener('click', addPrice);
+function searchPrice(){
+  const partName = document.getElementById('searchPart').value.trim().toLowerCase();
+  const supplierId = parseInt(document.getElementById('selectSupplier').value);
+  
+  if(!partName || !supplierId){
+    showToast('Preencha o nome da peça e selecione um fornecedor');
+    return;
+  }
+  
+  const parts = getParts();
+  const suppliers = getSuppliers();
+  
+  const part = parts.find(p => p.nome.toLowerCase().includes(partName) && p.supplierId === supplierId);
+  const supplier = suppliers.find(s => s.id === supplierId);
+  
+  if(!part){
+    showToast('Peça não encontrada para este fornecedor');
+    return;
+  }
+  
+  const margin = parseFloat(document.getElementById('marginProfit').value) || 30;
+  const finalPrice = part.preco * (1 + margin/100);
+  
+  document.getElementById('resultPart').textContent = esc(part.nome);
+  document.getElementById('resultSupplier').textContent = esc(supplier.nome);
+  document.getElementById('resultCost').textContent = fmt(part.preco);
+  document.getElementById('resultMargin').textContent = margin + '%';
+  document.getElementById('resultPrice').textContent = fmt(finalPrice);
+  document.getElementById('resultBox').style.display = 'block';
+}
 
-document.getElementById('pricesTableBody').addEventListener('click', e=>{
-  const edit = e.target.closest('[data-edit-price]');
-  const del = e.target.closest('[data-delete-price]');
-  if(edit) editPrice(parseInt(edit.dataset.editPrice));
-  if(del) deletePrice(parseInt(del.dataset.deletePrice));
+document.getElementById('btnAddSupplier').addEventListener('click', addSupplier);
+document.getElementById('btnAddPart').addEventListener('click', addPart);
+document.getElementById('btnSearchPrice').addEventListener('click', searchPrice);
+
+document.getElementById('searchPart').addEventListener('keypress', e=>{
+  if(e.key==='Enter') searchPrice();
+});
+
+document.getElementById('selectSupplier').addEventListener('change', ()=>{
+  document.getElementById('resultBox').style.display = 'none';
+});
+
+document.getElementById('marginProfit').addEventListener('change', ()=>{
+  if(document.getElementById('resultBox').style.display !== 'none'){
+    searchPrice();
+  }
+});
+
+document.getElementById('suppliersList').addEventListener('click', e=>{
+  const edit = e.target.closest('[data-edit-supplier]');
+  const del = e.target.closest('[data-delete-supplier]');
+  if(edit) editSupplier(parseInt(edit.dataset.editSupplier));
+  if(del) deleteSupplier(parseInt(del.dataset.deleteSupplier));
 });
 
 /* ============================= MODAL GENERIC ============================= */
