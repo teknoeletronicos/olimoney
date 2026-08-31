@@ -2725,9 +2725,6 @@ function renderSupplierPartsFiltered(){
         <td>${esc(p.nome)}</td>
         <td class="right num">${fmt(p.preco)}</td>
         <td class="center t-actions">
-          <button class="icon-btn" title="Enviar WhatsApp" data-whatsapp-supplier="${supplierId}" data-whatsapp-part="${p.id}">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-          </button>
           <button class="icon-btn" title="Editar" data-edit-part="${p.id}" data-supplier-id="${supplierId}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           </button>
@@ -3010,49 +3007,12 @@ document.getElementById('suppliersList').addEventListener('click', e=>{
 
 // Listener delegado (único) para editar/deletar peças da tabela do fornecedor aberto
 document.getElementById('supplierPartsTable').addEventListener('click', e=>{
-  const whatsapp = e.target.closest('[data-whatsapp-supplier]');
   const edit = e.target.closest('[data-edit-part]');
   const del = e.target.closest('[data-delete-part]');
-  if(whatsapp){
-    const supplier = state.suppliers.find(s => s.id === parseInt(whatsapp.dataset.whatsappSupplier));
-    const part = state.supplierParts.find(p => p.id === parseInt(whatsapp.dataset.whatsappPart));
-    if(supplier && part) sendWhatsAppMessage(supplier, part.nome);
-  }
   if(edit) editPart(edit.dataset.editPart, edit.dataset.supplierId);
   if(del) deletePart(del.dataset.deletePart);
 });
 
-
-/* ============================= WHATSAPP ============================= */
-function sendWhatsAppMessage(supplierId, partName){
-  const supplier = state.suppliers.find(s => s.id === parseInt(supplierId));
-  
-  if(!supplier){
-    showToast('Fornecedor não encontrado');
-    return;
-  }
-  
-  // Procura por um número de whatsapp no campo de contato
-  const whatsappMatch = supplier.contato?.match(/(\d{10,15})/);
-  const whatsappNum = whatsappMatch ? whatsappMatch[1] : null;
-  
-  if(!whatsappNum){
-    showToast('Este fornecedor não tem um número de WhatsApp cadastrado no contato');
-    return;
-  }
-  
-  // Garante que tem o código do país
-  let finalNum = whatsappNum;
-  if(!finalNum.startsWith('55')){
-    finalNum = '55' + finalNum;
-  }
-  
-  const message = `Olá, gostaria de saber se vocês têm disponível a peça *${partName}*?`;
-  const encodedMessage = encodeURIComponent(message);
-  const whatsappUrl = `https://wa.me/${finalNum}?text=${encodedMessage}`;
-  
-  window.open(whatsappUrl, '_blank');
-}
 
 /* ============================= MODAL GENERIC ============================= */
 let currentSaveHandler = null;
