@@ -2676,6 +2676,21 @@ function renderSuppliers(){
     item.addEventListener('mouseenter', ()=> item.style.background = 'var(--surface)');
     item.addEventListener('mouseleave', ()=> item.style.background = 'var(--surface-2)');
   });
+
+  // Adicionar listeners para editar/deletar
+  document.querySelectorAll('[data-edit-supplier]').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      editSupplier(parseInt(btn.dataset.editSupplier));
+    });
+  });
+
+  document.querySelectorAll('[data-delete-supplier]').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      deleteSupplier(parseInt(btn.dataset.deleteSupplier));
+    });
+  });
 }
 
 function updateSupplierSelect(){
@@ -3012,14 +3027,7 @@ document.getElementById('marginProfit').addEventListener('change', ()=>{
   }
 });
 
-document.getElementById('suppliersList').addEventListener('click', e=>{
-  const edit = e.target.closest('[data-edit-supplier]');
-  const del = e.target.closest('[data-delete-supplier]');
-  if(edit) editSupplier(edit.dataset.editSupplier);
-  if(del) deleteSupplier(del.dataset.deleteSupplier);
-});
-
-// Listener delegado (único) para editar/deletar peças da tabela do fornecedor aberto
+// Event listener para peças da tabela do fornecedor aberto
 document.getElementById('supplierPartsTable').addEventListener('click', e=>{
   const whatsapp = e.target.closest('[data-whatsapp-part]');
   const edit = e.target.closest('[data-edit-part]');
