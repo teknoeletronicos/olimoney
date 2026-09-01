@@ -913,6 +913,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const TRIAL_DAYS = 7;
 const PAYMENT_LINK_URL = ""; // COLE AQUI o link de pagamento (Stripe/Mercado Pago) quando tiver
 const LICENSE_SECRET = "olimoney-2026-troque-este-segredo";
+const BUSINESS_NAME = "TEKNO ELETRÔNICOS"; // usado na mensagem de WhatsApp e em outros textos
 
 /* ============================= STATE ============================= */
 let state = { products: [], orders: [], expenses: [], sales: [], saleItems: [], orderMedia: [], suppliers: [], supplierParts: [] };
@@ -1047,8 +1048,8 @@ async function fetchAllData(){
   }
 }
 
-function supplierFromDb(r){ return {id:r.id, nome:r.nome, contato:r.contato||''}; }
-function supplierToDb(s){ return {nome:s.nome, contato:s.contato}; }
+function supplierFromDb(r){ return {id:r.id, nome:r.nome, contato:r.contato||'', whatsapp:r.whatsapp||''}; }
+function supplierToDb(s){ return {nome:s.nome, contato:s.contato, whatsapp:s.whatsapp}; }
 function partFromDb(r){ return {id:r.id, supplierId:r.supplier_id, nome:r.nome, preco:Number(r.preco||0)}; }
 function partToDb(p){ return {supplier_id:p.supplierId, nome:p.nome, preco:p.preco}; }
 
@@ -2656,7 +2657,7 @@ function renderSuppliers(){
         <div style="font-weight:600;">${esc(s.nome)}</div>
         <div style="font-size:12px; color:var(--muted);">${esc(s.contato || '—')}</div>
       </div>
-      <div class="t-actions" onclick="event.stopPropagation();">
+      <div class="t-actions">
         <button class="icon-btn" title="Editar" data-edit-supplier="${s.id}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         </button>
@@ -2666,17 +2667,24 @@ function renderSuppliers(){
       </div>
     </div>
   `).join('');
-
-  document.querySelectorAll('.supplier-item').forEach(item=>{
-    item.addEventListener('click', ()=>{
-      const supplierId = item.dataset.supplierId;
-      const supplierName = item.dataset.supplierName;
-      showSupplierParts(supplierId, supplierName);
-    });
-    item.addEventListener('mouseenter', ()=> item.style.background = 'var(--surface)');
-    item.addEventListener('mouseleave', ()=> item.style.background = 'var(--surface-2)');
-  });
 }
+
+document.getElementById('suppliersList').addEventListener('click', e=>{
+  const edit = e.target.closest('[data-edit-supplier]');
+  const del = e.target.closest('[data-delete-supplier]');
+  const item = e.target.closest('.supplier-item');
+  if(edit){ editSupplier(edit.dataset.editSupplier); return; }
+  if(del){ deleteSupplier(del.dataset.deleteSupplier); return; }
+  if(item){ showSupplierParts(item.dataset.supplierId, item.dataset.supplierName); }
+});
+document.getElementById('suppliersList').addEventListener('mouseover', e=>{
+  const item = e.target.closest('.supplier-item');
+  if(item) item.style.background = 'var(--surface)';
+});
+document.getElementById('suppliersList').addEventListener('mouseout', e=>{
+  const item = e.target.closest('.supplier-item');
+  if(item) item.style.background = 'var(--surface-2)';
+});
 
 function updateSupplierSelect(){
   const suppliers = state.suppliers;
@@ -2725,6 +2733,9 @@ function renderSupplierPartsFiltered(){
         <td>${esc(p.nome)}</td>
         <td class="right num">${fmt(p.preco)}</td>
         <td class="center t-actions">
+          <button class="icon-btn" title="Perguntar disponibilidade no WhatsApp" data-whatsapp-part="${p.id}" style="color:#25D366;">
+            <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12.04 2c-5.46 0-9.9 4.44-9.9 9.9 0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.9-4.44 9.9-9.9 0-2.64-1.03-5.12-2.9-6.99A9.82 9.82 0 0 0 12.04 2zm5.8 14.16c-.24.68-1.4 1.3-1.93 1.38-.5.08-1.12.11-1.8-.11-.42-.13-.95-.31-1.64-.6-2.88-1.24-4.76-4.15-4.9-4.34-.14-.19-1.17-1.56-1.17-2.98 0-1.41.74-2.11 1-2.4.26-.29.57-.36.76-.36.19 0 .38 0 .55.01.18.01.42-.07.65.5.24.58.82 2 .89 2.15.07.15.12.32.02.51-.1.19-.15.31-.29.48-.15.17-.31.38-.44.51-.15.15-.3.31-.13.6.17.29.76 1.25 1.63 2.02 1.12.99 2.06 1.3 2.35 1.45.29.15.46.13.63-.05.17-.18.72-.83.91-1.11.19-.29.38-.24.63-.14.26.1 1.66.78 1.94.92.29.15.48.22.55.34.07.13.07.72-.17 1.4z"/></svg>
+          </button>
           <button class="icon-btn" title="Editar" data-edit-part="${p.id}" data-supplier-id="${supplierId}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           </button>
@@ -2743,6 +2754,25 @@ function refreshOpenSupplierParts(){
   if(sup) showSupplierParts(sup.id, sup.nome);
 }
 
+function formatPhoneForWhatsapp(phone){
+  let digits = (phone||'').replace(/\D/g,'');
+  if(!digits) return null;
+  if(digits.length<=11) digits = '55' + digits; // assume Brasil se não tiver código do país
+  return digits;
+}
+
+function sendWhatsappForPart(partId){
+  const part = state.supplierParts.find(p=>p.id===partId);
+  if(!part) return;
+  const supplier = state.suppliers.find(s=>s.id===part.supplierId);
+  if(!supplier){ showToast('Fornecedor não encontrado'); return; }
+  const phone = formatPhoneForWhatsapp(supplier.whatsapp);
+  if(!phone){ showToast('Cadastre o WhatsApp deste fornecedor primeiro (editar fornecedor)'); return; }
+  const msg = `Olá, ${supplier.nome}! Aqui é da ${BUSINESS_NAME}. Vocês têm disponível a peça "${part.nome}"? Se sim, qual o preço e prazo de entrega?`;
+  const url = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+  window.open(url, '_blank');
+}
+
 function addSupplier(){
   const modalBody = document.getElementById('modalBody');
   const modalTitle = document.getElementById('modalTitle');
@@ -2754,8 +2784,12 @@ function addSupplier(){
       <input type="text" id="newSupplierName" placeholder="Ex: TechParts Brasil">
     </div>
     <div class="field">
-      <label>Contato (telefone/email/cidade)</label>
-      <input type="text" id="newSupplierContact" placeholder="Ex: (11) 9999-9999 | vendas@techparts.com.br">
+      <label>WhatsApp (com DDD)</label>
+      <input type="tel" id="newSupplierWhatsapp" placeholder="Ex: (11) 99999-9999">
+    </div>
+    <div class="field">
+      <label>Contato (email/cidade, opcional)</label>
+      <input type="text" id="newSupplierContact" placeholder="Ex: vendas@techparts.com.br">
     </div>
   `;
 
@@ -2763,13 +2797,14 @@ function addSupplier(){
 
   openModal(async ()=>{
     const nome = document.getElementById('newSupplierName').value.trim();
+    const whatsapp = document.getElementById('newSupplierWhatsapp').value.trim();
     const contato = document.getElementById('newSupplierContact').value.trim();
     if(!nome){
       showToast('Preencha o nome do fornecedor');
       return false;
     }
     try{
-      const payload = Object.assign(supplierToDb({nome, contato}), {user_id: currentUser.id});
+      const payload = Object.assign(supplierToDb({nome, contato, whatsapp}), {user_id: currentUser.id});
       const {data, error} = await sb.from('suppliers').insert(payload).select().single();
       if(error) throw error;
       state.suppliers.push(supplierFromDb(data));
@@ -2794,23 +2829,29 @@ function editSupplier(id){
       <input type="text" id="editSupplierName" value="${esc(supplier.nome)}">
     </div>
     <div class="field">
-      <label>Contato (telefone/email/cidade)</label>
+      <label>WhatsApp (com DDD)</label>
+      <input type="tel" id="editSupplierWhatsapp" value="${esc(supplier.whatsapp||'')}" placeholder="Ex: (11) 99999-9999">
+    </div>
+    <div class="field">
+      <label>Contato (email/cidade, opcional)</label>
       <input type="text" id="editSupplierContact" value="${esc(supplier.contato||'')}">
     </div>
   `;
 
   openModal(async ()=>{
     const nome = document.getElementById('editSupplierName').value.trim();
+    const whatsapp = document.getElementById('editSupplierWhatsapp').value.trim();
     const contato = document.getElementById('editSupplierContact').value.trim();
     if(!nome){
       showToast('Preencha o nome do fornecedor');
       return false;
     }
     try{
-      const {error} = await sb.from('suppliers').update(supplierToDb({nome, contato})).eq('id', id);
+      const {error} = await sb.from('suppliers').update(supplierToDb({nome, contato, whatsapp})).eq('id', id);
       if(error) throw error;
       supplier.nome = nome;
       supplier.contato = contato;
+      supplier.whatsapp = whatsapp;
     }catch(e){ showToast('Erro ao salvar: ' + e.message); return false; }
     renderSuppliers();
     updateSupplierSelect();
@@ -2998,19 +3039,14 @@ document.getElementById('marginProfit').addEventListener('change', ()=>{
   }
 });
 
-document.getElementById('suppliersList').addEventListener('click', e=>{
-  const edit = e.target.closest('[data-edit-supplier]');
-  const del = e.target.closest('[data-delete-supplier]');
-  if(edit) editSupplier(edit.dataset.editSupplier);
-  if(del) deleteSupplier(del.dataset.deleteSupplier);
-});
-
-// Listener delegado (único) para editar/deletar peças da tabela do fornecedor aberto
+// Listener delegado (único) para editar/deletar/whatsapp das peças da tabela do fornecedor aberto
 document.getElementById('supplierPartsTable').addEventListener('click', e=>{
   const edit = e.target.closest('[data-edit-part]');
   const del = e.target.closest('[data-delete-part]');
+  const wa = e.target.closest('[data-whatsapp-part]');
   if(edit) editPart(edit.dataset.editPart, edit.dataset.supplierId);
   if(del) deletePart(del.dataset.deletePart);
+  if(wa) sendWhatsappForPart(wa.dataset.whatsappPart);
 });
 
 
