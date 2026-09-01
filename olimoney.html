@@ -391,7 +391,7 @@ tbody tr:hover{background:var(--surface-2);}
 @media (max-width:860px){
   #app{flex-direction:column;}
   .sidebar{
-    width:100%; flex: 0 0 200px, height:100px; position:sticky; top:0; flex-direction:row; align-items:center;
+    width:100%; height:auto; position:sticky; top:0; flex-direction:row; align-items:center;
     padding:6px 10px; overflow-x:auto; z-index:20; transition:transform .22s ease;
   }
   .sidebar.sidebar-hidden{transform:translateY(-100%);}
@@ -413,6 +413,40 @@ tbody tr:hover{background:var(--surface-2);}
   .two-col{grid-template-columns:1fr;}
   .form-grid{grid-template-columns:1fr;}
   .hist-summary{grid-template-columns:1fr;}
+  
+  /* Responsivo para tabela de peças */
+  #supplierPartsTable tbody tr{
+    display:grid;
+    grid-template-columns:1fr auto;
+    gap:8px;
+    padding:12px;
+    border:1px solid var(--line);
+    border-radius:8px;
+    margin-bottom:8px;
+  }
+  #supplierPartsTable tbody tr td{
+    border:none !important;
+    padding:0 !important;
+  }
+  #supplierPartsTable tbody tr td:nth-child(1){
+    grid-column:1/3;
+    word-break:break-word;
+  }
+  #supplierPartsTable tbody tr td:nth-child(2){
+    grid-column:1/2;
+    text-align:left;
+    font-size:12px;
+    color:var(--muted);
+  }
+  #supplierPartsTable tbody tr td:nth-child(3){
+    grid-column:2/3;
+    text-align:right;
+  }
+  #supplierPartsTable thead{display:none;}
+  #supplierPartsBody{
+    display:grid;
+    gap:0;
+  }
 }
 </style>
 </head>
@@ -2729,10 +2763,10 @@ function renderSupplierPartsFiltered(){
   } else {
     document.getElementById('supplierPartsEmpty').style.display = 'none';
     document.getElementById('supplierPartsBody').innerHTML = supplierParts.map(p=>`
-      <tr>
+      <tr data-part-id="${p.id}" data-part-name="${esc(p.nome)}" data-part-preco="${p.preco}" style="cursor:pointer; transition:background .12s;" onmouseover="this.style.background='var(--surface)'" onmouseout="this.style.background='transparent'">
         <td>${esc(p.nome)}</td>
         <td class="right num">${fmt(p.preco)}</td>
-        <td class="center t-actions">
+        <td class="center t-actions" onclick="event.stopPropagation();">
           <button class="icon-btn" title="Perguntar disponibilidade no WhatsApp" data-whatsapp-part="${p.id}" style="color:#25D366;">
             <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12.04 2c-5.46 0-9.9 4.44-9.9 9.9 0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.9-4.44 9.9-9.9 0-2.64-1.03-5.12-2.9-6.99A9.82 9.82 0 0 0 12.04 2zm5.8 14.16c-.24.68-1.4 1.3-1.93 1.38-.5.08-1.12.11-1.8-.11-.42-.13-.95-.31-1.64-.6-2.88-1.24-4.76-4.15-4.9-4.34-.14-.19-1.17-1.56-1.17-2.98 0-1.41.74-2.11 1-2.4.26-.29.57-.36.76-.36.19 0 .38 0 .55.01.18.01.42-.07.65.5.24.58.82 2 .89 2.15.07.15.12.32.02.51-.1.19-.15.31-.29.48-.15.17-.31.38-.44.51-.15.15-.3.31-.13.6.17.29.76 1.25 1.63 2.02 1.12.99 2.06 1.3 2.35 1.45.29.15.46.13.63-.05.17-.18.72-.83.91-1.11.19-.29.38-.24.63-.14.26.1 1.66.78 1.94.92.29.15.48.22.55.34.07.13.07.72-.17 1.4z"/></svg>
           </button>
@@ -3041,13 +3075,43 @@ document.getElementById('marginProfit').addEventListener('change', ()=>{
 
 // Listener delegado (único) para editar/deletar/whatsapp das peças da tabela do fornecedor aberto
 document.getElementById('supplierPartsTable').addEventListener('click', e=>{
+  const tr = e.target.closest('tr[data-part-id]');
   const edit = e.target.closest('[data-edit-part]');
   const del = e.target.closest('[data-delete-part]');
   const wa = e.target.closest('[data-whatsapp-part]');
-  if(edit) editPart(edit.dataset.editPart, edit.dataset.supplierId);
-  if(del) deletePart(del.dataset.deletePart);
-  if(wa) sendWhatsappForPart(wa.dataset.whatsappPart);
+  
+  // Se clicou em um botão, executa o handler do botão
+  if(edit || del || wa){
+    if(edit) editPart(edit.dataset.editPart, edit.dataset.supplierId);
+    if(del) deletePart(del.dataset.deletePart);
+    if(wa) sendWhatsappForPart(wa.dataset.whatsappPart);
+  }
+  // Se clicou na linha (sem clicar em botão), gera o orçamento
+  else if(tr && !edit && !del && !wa){
+    generateQuoteFromPart(tr.dataset.partId, tr.dataset.partName, parseFloat(tr.dataset.partPreco), currentOpenSupplierId);
+  }
 });
+
+function generateQuoteFromPart(partId, partName, partPreco, supplierId){
+  const supplier = state.suppliers.find(s => s.id === supplierId);
+  if(!supplier) return;
+  
+  const margin = parseFloat(document.getElementById('marginProfit').value) || 30;
+  const finalPrice = partPreco * (1 + margin/100);
+  
+  document.getElementById('resultPart').textContent = esc(partName);
+  document.getElementById('resultSupplier').textContent = esc(supplier.nome);
+  document.getElementById('resultCost').textContent = fmt(partPreco);
+  document.getElementById('resultMargin').textContent = margin + '%';
+  document.getElementById('resultPrice').textContent = fmt(finalPrice);
+  document.getElementById('resultBox').style.display = 'block';
+  
+  // Scroll para mostrar o resultado (especialmente útil em celular)
+  setTimeout(()=>{
+    const resultBox = document.getElementById('resultBox');
+    if(resultBox) resultBox.scrollIntoView({behavior:'smooth', block:'nearest'});
+  }, 100);
+}
 
 
 /* ============================= MODAL GENERIC ============================= */
