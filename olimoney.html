@@ -851,6 +851,50 @@ tbody tr:hover{background:var(--surface-2);}
                 <span style="color:var(--teal); font-weight:600;">Orçamento para cliente:</span>
                 <span id="resultPrice" class="num" style="font-weight:700; font-size:18px; color:var(--teal);"></span>
               </div>
+
+              <div style="margin-top:18px; padding-top:16px; border-top:1px solid var(--line);">
+                <div class="field" style="margin-bottom:10px;">
+                  <label>Forma de pagamento</label>
+                  <select id="paymentMethod">
+                    <option value="dinheiro">Dinheiro</option>
+                    <option value="pix">Pix</option>
+                    <option value="cartao">Cartão</option>
+                  </select>
+                </div>
+
+                <div id="cardOptionsBox" style="display:none;">
+                  <div class="field" style="margin-bottom:10px;">
+                    <label>Tipo de cartão</label>
+                    <select id="cardType">
+                      <option value="debito">Débito</option>
+                      <option value="credito">Crédito</option>
+                    </select>
+                  </div>
+                  <div class="field" id="installmentsBox" style="margin-bottom:10px; display:none;">
+                    <label>Parcelas</label>
+                    <select id="cardInstallments"></select>
+                  </div>
+                </div>
+
+                <div id="paymentBreakdown" style="margin-top:14px; padding:12px; background:var(--surface); border-radius:8px; border:1px solid var(--line);">
+                  <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                    <span style="color:var(--muted); font-size:13px;">Valor da parcela:</span>
+                    <span id="resultInstallmentValue" class="num" style="font-weight:600;"></span>
+                  </div>
+                  <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                    <span style="color:var(--muted); font-size:13px;">Taxa da maquininha:</span>
+                    <span id="resultFee" class="num" style="font-weight:600;"></span>
+                  </div>
+                  <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                    <span style="color:var(--ink); font-weight:600;">Total que o cliente paga:</span>
+                    <span id="resultClientTotal" class="num" style="font-weight:700; font-size:16px;"></span>
+                  </div>
+                  <div style="display:flex; justify-content:space-between;">
+                    <span style="color:var(--teal); font-weight:600;">Seu lucro:</span>
+                    <span id="resultProfit" class="num" style="font-weight:700; font-size:16px; color:var(--teal);"></span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -3003,13 +3047,82 @@ async function deletePart(partId){
 }
 
 let lastGeneratedPartId = null;
+let currentBudgetBase = 0; // orçamento (custo + margem), o valor líquido que você quer receber
+let currentBudgetCost = 0; // custo da peça
 
-function generateBudgetForPart(part){
+// Taxas da maquininha (baseadas no plano cadastrado pelo usuário)
+const CARD_FEES = {
+  debito: 0.0198,
+  credito: {
+    1: 0.0486,
+    2: 0.1086, 3: 0.1224, 4: 0.1359, 5: 0.1492, 6: 0.1622,
+    7: 0.1750, 8: 0.1876, 9: 0.1999, 10: 0.2119, 11: 0.2139,
+    12: 0.2139, 13: 0.2203, 14: 0.2267, 15: 0.2331, 16: 0.2395,
+    17: 0.2459, 18: 0.2523, 19: 0.2587, 20: 0.2651, 21: 0.2715
+  }
+};
+
+function populateInstallmentsSelect(){
+  const sel = document.getElementById('cardInstallments');
+  sel.innerHTML = '';
+  const opt1 = document.createElement('option');
+  opt1.value = '1';
+  opt1.textContent = 'À vista (1x)';
+  sel.appendChild(opt1);
+  for(let n=2; n<=21; n++){
+    const opt = document.createElement('option');
+    opt.value = String(n);
+    opt.textContent = n + 'x';
+    sel.appendChild(opt);
+  }
+}
+populateInstallmentsSelect();
+
+function getCurrentFee(){
+  const method = document.getElementById('paymentMethod').value;
+  if(method !== 'cartao') return 0;
+  const cardType = document.getElementById('cardType').value;
+  if(cardType === 'debito') return CARD_FEES.debito;
+  const n = parseInt(document.getElementById('cardInstallments').value, 10) || 1;
+  return CARD_FEES.credito[n] ?? CARD_FEES.credito[1];
+}
+
+function updatePaymentBreakdown(){
+  if(currentBudgetBase <= 0) return;
+  const method = document.getElementById('paymentMethod').value;
+  document.getElementById('cardOptionsBox').style.display = (method === 'cartao') ? 'block' : 'none';
+
+  const cardType = document.getElementById('cardType').value;
+  const isParceladoCredito = (method === 'cartao' && cardType === 'credito');
+  document.getElementById('installmentsBox').style.display = isParceladoCredito ? 'block' : 'none';
+
+  const n = isParceladoCredito ? (parseInt(document.getElementById('cardInstallments').value, 10) || 1) : 1;
+  const fee = getCurrentFee();
+
+  // Taxa é repassada ao cliente: o valor cobrado do cliente é ajustado para que,
+  // depois de descontada a taxa da maquininha, você receba o valor cheio do orçamento.
+  const clientTotal = fee > 0 ? (currentBudgetBase / (1 - fee)) : currentBudgetBase;
+  const installmentValue = clientTotal / n;
+  const feeAmount = clientTotal - currentBudgetBase;
+  const profit = currentBudgetBase - currentBudgetCost;
+
+  document.getElementById('resultInstallmentValue').textContent =
+    (n > 1 ? n + 'x de ' : '') + fmt(installmentValue);
+  document.getElementById('resultFee').textContent =
+    fee > 0 ? (fmt(feeAmount) + ' (' + (fee*100).toFixed(2).replace('.', ',') + '%)') : 'Sem taxa';
+  document.getElementById('resultClientTotal').textContent = fmt(clientTotal);
+  document.getElementById('resultProfit').textContent = fmt(profit);
+}
+
+function generateBudgetForPart(part, resetPayment = true){
   const supplier = state.suppliers.find(s=>s.id===part.supplierId);
   const margin = parseFloat(document.getElementById('marginProfit').value) || 30;
   const finalPrice = part.preco * (1 + margin/100);
 
   lastGeneratedPartId = part.id;
+  currentBudgetBase = finalPrice;
+  currentBudgetCost = part.preco;
+
   document.getElementById('resultPart').textContent = part.nome;
   document.getElementById('resultSupplier').textContent = supplier ? supplier.nome : '—';
   document.getElementById('resultCost').textContent = fmt(part.preco);
@@ -3017,7 +3130,19 @@ function generateBudgetForPart(part){
   document.getElementById('resultPrice').textContent = fmt(finalPrice);
   document.getElementById('budgetEmpty').style.display = 'none';
   document.getElementById('resultBox').style.display = 'block';
+
+  // Reseta forma de pagamento para Dinheiro apenas ao gerar um orçamento novo
+  if(resetPayment){
+    document.getElementById('paymentMethod').value = 'dinheiro';
+    document.getElementById('cardType').value = 'debito';
+    document.getElementById('cardInstallments').value = '1';
+  }
+  updatePaymentBreakdown();
 }
+
+document.getElementById('paymentMethod').addEventListener('change', updatePaymentBreakdown);
+document.getElementById('cardType').addEventListener('change', updatePaymentBreakdown);
+document.getElementById('cardInstallments').addEventListener('change', updatePaymentBreakdown);
 
 document.getElementById('btnAddSupplier').addEventListener('click', addSupplier);
 document.getElementById('btnAddPart').addEventListener('click', addPart);
@@ -3032,7 +3157,7 @@ document.getElementById('supplierPartsCategoryFilter').addEventListener('change'
 document.getElementById('marginProfit').addEventListener('change', ()=>{
   if(lastGeneratedPartId){
     const part = state.supplierParts.find(p=>p.id===lastGeneratedPartId);
-    if(part) generateBudgetForPart(part);
+    if(part) generateBudgetForPart(part, false);
   }
 });
 
