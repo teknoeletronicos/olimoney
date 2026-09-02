@@ -138,7 +138,7 @@ nav.navlist{display:flex; flex-direction:column; gap:2px; flex:1;}
 /* ---------- panels / cards ---------- */
 .panel{
   background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
-  padding:18px 20px; margin-bottom:18px;
+  padding:18px 20px; margin-bottom:18px; min-width:0;
 }
 .panel-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; gap:10px; flex-wrap:wrap;}
 .panel-title{font-family:'Barlow Condensed',sans-serif; font-size:19px; font-weight:700;}
@@ -413,40 +413,6 @@ tbody tr:hover{background:var(--surface-2);}
   .two-col{grid-template-columns:1fr;}
   .form-grid{grid-template-columns:1fr;}
   .hist-summary{grid-template-columns:1fr;}
-  
-  /* Responsivo para tabela de peças */
-  #supplierPartsTable tbody tr{
-    display:grid;
-    grid-template-columns:1fr auto;
-    gap:8px;
-    padding:12px;
-    border:1px solid var(--line);
-    border-radius:8px;
-    margin-bottom:8px;
-  }
-  #supplierPartsTable tbody tr td{
-    border:none !important;
-    padding:0 !important;
-  }
-  #supplierPartsTable tbody tr td:nth-child(1){
-    grid-column:1/3;
-    word-break:break-word;
-  }
-  #supplierPartsTable tbody tr td:nth-child(2){
-    grid-column:1/2;
-    text-align:left;
-    font-size:12px;
-    color:var(--muted);
-  }
-  #supplierPartsTable tbody tr td:nth-child(3){
-    grid-column:2/3;
-    text-align:right;
-  }
-  #supplierPartsTable thead{display:none;}
-  #supplierPartsBody{
-    display:grid;
-    gap:0;
-  }
 }
 </style>
 </head>
@@ -788,7 +754,7 @@ tbody tr:hover{background:var(--surface-2);}
       <!-- SISTEMA DE FORNECEDORES -->
       <section class="view" id="view-prices">
         <div class="toolbar">
-          <div style="display:flex; gap:12px;">
+          <div style="display:flex; gap:12px; flex-wrap:wrap;">
             <button class="btn btn-primary" id="btnAddSupplier">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
               Novo fornecedor
@@ -799,7 +765,7 @@ tbody tr:hover{background:var(--surface-2);}
             </button>
           </div>
           <div style="flex:1"></div>
-          <div class="field" style="min-width:200px;">
+          <div class="field" style="min-width:160px;">
             <label>Margem de lucro (%)</label>
             <input type="number" id="marginProfit" min="0" max="999" step="1" value="30">
           </div>
@@ -817,14 +783,17 @@ tbody tr:hover{background:var(--surface-2);}
 
             <!-- Tabela de peças do fornecedor selecionado -->
             <div id="supplierPartsBox" style="display:none; margin-top:20px; padding-top:20px; border-top:1px solid var(--line);">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
                 <div class="panel-title" style="margin:0;">Peças de <span id="selectedSupplierName" style="color:var(--copper);"></span></div>
                 <button class="icon-btn" id="btnCloseSupplierParts" title="Fechar">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
                 </button>
               </div>
               <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
-                <input type="text" id="supplierPartsSearch" placeholder="Buscar peça..." style="flex:1; min-width:160px;">
+                <input type="text" id="supplierPartsSearch" placeholder="Buscar peça..." style="flex:1; min-width:140px;">
+                <select id="supplierPartsCategoryFilter" style="flex:0 0 auto;">
+                  <option value="">Todas categorias</option>
+                </select>
                 <select id="supplierPartsSort" style="flex:0 0 auto;">
                   <option value="nome_asc">Nome (A-Z)</option>
                   <option value="nome_desc">Nome (Z-A)</option>
@@ -836,9 +805,9 @@ tbody tr:hover{background:var(--surface-2);}
                 <table id="supplierPartsTable">
                   <thead>
                     <tr>
-                      <th style="width:60%">Peça</th>
-                      <th style="width:30%" class="right">Preço</th>
-                      <th style="width:10%" class="center">Ações</th>
+                      <th style="width:50%">Peça</th>
+                      <th style="width:20%" class="right">Preço</th>
+                      <th style="width:30%" class="center">Ações</th>
                     </tr>
                   </thead>
                   <tbody id="supplierPartsBody"></tbody>
@@ -853,18 +822,18 @@ tbody tr:hover{background:var(--surface-2);}
           <!-- Painel de Consulta -->
           <div class="panel">
             <div class="panel-title">Consultar Preço</div>
-            <div class="field">
+            <div class="field" style="position:relative;">
               <label>Nome da peça</label>
-              <input type="text" id="searchPart" placeholder="Ex: Tela iPhone 11">
+              <input type="text" id="searchPart" placeholder="Digite para buscar..." autocomplete="off">
+              <div id="searchPartResults" class="autocomplete-results" style="display:none;"></div>
             </div>
             <div class="field">
-              <label>Fornecedor</label>
+              <label>Fornecedor (opcional, para filtrar)</label>
               <select id="selectSupplier">
-                <option value="">Selecione um fornecedor</option>
+                <option value="">Todos os fornecedores</option>
               </select>
             </div>
-            <button class="btn btn-primary" id="btnSearchPrice">Buscar</button>
-            
+
             <div id="resultBox" style="display:none; margin-top:20px; padding:16px; background:var(--surface-2); border-radius:8px;">
               <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
                 <span style="color:var(--muted);">Peça:</span>
@@ -1084,8 +1053,14 @@ async function fetchAllData(){
 
 function supplierFromDb(r){ return {id:r.id, nome:r.nome, contato:r.contato||'', whatsapp:r.whatsapp||''}; }
 function supplierToDb(s){ return {nome:s.nome, contato:s.contato, whatsapp:s.whatsapp}; }
-function partFromDb(r){ return {id:r.id, supplierId:r.supplier_id, nome:r.nome, preco:Number(r.preco||0)}; }
-function partToDb(p){ return {supplier_id:p.supplierId, nome:p.nome, preco:p.preco}; }
+function partFromDb(r){ return {id:r.id, supplierId:r.supplier_id, nome:r.nome, preco:Number(r.preco||0), categoria:r.categoria||''}; }
+function partToDb(p){ return {supplier_id:p.supplierId, nome:p.nome, preco:p.preco, categoria:p.categoria}; }
+function partCategoryOptionsHtml(){
+  const defaults = ['Tela','Subplaca','Bateria','Câmera','Conector de Carga','Alto-falante','Microfone','Flex','Carcaça','Botão','Sensor','Outros'];
+  const fromParts = state.supplierParts.map(p=>p.categoria).filter(Boolean);
+  const all = Array.from(new Set([...defaults, ...fromParts]));
+  return all.map(c=>`<option value="${esc(c)}"></option>`).join('');
+}
 
 /* ============================= LICENÇA / TESTE GRÁTIS ============================= */
 async function loadProfile(){
@@ -2725,7 +2700,7 @@ function updateSupplierSelect(){
   const select = document.getElementById('selectSupplier');
   const currentValue = select.value;
 
-  select.innerHTML = '<option value="">Selecione um fornecedor</option>' +
+  select.innerHTML = '<option value="">Todos os fornecedores</option>' +
     suppliers.map(s=>`<option value="${s.id}">${esc(s.nome)}</option>`).join('');
 
   select.value = currentValue;
@@ -2743,9 +2718,20 @@ function renderSupplierPartsFiltered(){
   const supplierId = currentOpenSupplierId;
   const query = (document.getElementById('supplierPartsSearch').value||'').trim().toLowerCase();
   const sortBy = document.getElementById('supplierPartsSort').value;
+  const categoryFilter = document.getElementById('supplierPartsCategoryFilter').value;
 
-  let supplierParts = state.supplierParts.filter(p => p.supplierId === supplierId);
+  const allSupplierParts = state.supplierParts.filter(p => p.supplierId === supplierId);
+
+  // popular o filtro de categorias com as categorias existentes desse fornecedor
+  const catSelect = document.getElementById('supplierPartsCategoryFilter');
+  const cats = Array.from(new Set(allSupplierParts.map(p=>p.categoria).filter(Boolean))).sort();
+  const prevCatValue = catSelect.value;
+  catSelect.innerHTML = '<option value="">Todas categorias</option>' + cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  catSelect.value = cats.includes(prevCatValue) ? prevCatValue : '';
+
+  let supplierParts = allSupplierParts;
   if(query) supplierParts = supplierParts.filter(p => p.nome.toLowerCase().includes(query));
+  if(catSelect.value) supplierParts = supplierParts.filter(p => p.categoria === catSelect.value);
 
   supplierParts = supplierParts.slice().sort((a,b)=>{
     if(sortBy==='nome_asc') return a.nome.localeCompare(b.nome);
@@ -2758,15 +2744,15 @@ function renderSupplierPartsFiltered(){
   if(supplierParts.length === 0){
     document.getElementById('supplierPartsEmpty').style.display = 'block';
     document.getElementById('supplierPartsEmpty').querySelector('.empty-title').textContent =
-      query ? 'Nenhuma peça encontrada para essa busca' : 'Nenhuma peça cadastrada';
+      (query || catSelect.value) ? 'Nenhuma peça encontrada para esse filtro' : 'Nenhuma peça cadastrada';
     document.getElementById('supplierPartsBody').innerHTML = '';
   } else {
     document.getElementById('supplierPartsEmpty').style.display = 'none';
     document.getElementById('supplierPartsBody').innerHTML = supplierParts.map(p=>`
-      <tr data-part-id="${p.id}" data-part-name="${esc(p.nome)}" data-part-preco="${p.preco}" style="cursor:pointer; transition:background .12s;" onmouseover="this.style.background='var(--surface)'" onmouseout="this.style.background='transparent'">
-        <td>${esc(p.nome)}</td>
+      <tr>
+        <td><b>${esc(p.nome)}</b>${p.categoria ? `<div class="subtle">${esc(p.categoria)}</div>` : ''}</td>
         <td class="right num">${fmt(p.preco)}</td>
-        <td class="center t-actions" onclick="event.stopPropagation();">
+        <td class="center t-actions">
           <button class="icon-btn" title="Perguntar disponibilidade no WhatsApp" data-whatsapp-part="${p.id}" style="color:#25D366;">
             <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12.04 2c-5.46 0-9.9 4.44-9.9 9.9 0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.9-4.44 9.9-9.9 0-2.64-1.03-5.12-2.9-6.99A9.82 9.82 0 0 0 12.04 2zm5.8 14.16c-.24.68-1.4 1.3-1.93 1.38-.5.08-1.12.11-1.8-.11-.42-.13-.95-.31-1.64-.6-2.88-1.24-4.76-4.15-4.9-4.34-.14-.19-1.17-1.56-1.17-2.98 0-1.41.74-2.11 1-2.4.26-.29.57-.36.76-.36.19 0 .38 0 .55.01.18.01.42-.07.65.5.24.58.82 2 .89 2.15.07.15.12.32.02.51-.1.19-.15.31-.29.48-.15.17-.31.38-.44.51-.15.15-.3.31-.13.6.17.29.76 1.25 1.63 2.02 1.12.99 2.06 1.3 2.35 1.45.29.15.46.13.63-.05.17-.18.72-.83.91-1.11.19-.29.38-.24.63-.14.26.1 1.66.78 1.94.92.29.15.48.22.55.34.07.13.07.72-.17 1.4z"/></svg>
           </button>
@@ -2928,6 +2914,11 @@ function addPart(){
       <input type="text" id="newPartName" placeholder="Ex: Tela iPhone 11">
     </div>
     <div class="field">
+      <label>Categoria</label>
+      <input type="text" id="newPartCategory" list="partCategoryOptions" placeholder="Ex: Tela, Subplaca, Bateria...">
+      <datalist id="partCategoryOptions">${partCategoryOptionsHtml()}</datalist>
+    </div>
+    <div class="field">
       <label>Fornecedor</label>
       <select id="newPartSupplier">
         ${suppliers.map(s=>`<option value="${s.id}" ${s.id===currentOpenSupplierId?'selected':''}>${esc(s.nome)}</option>`).join('')}
@@ -2943,6 +2934,7 @@ function addPart(){
 
   openModal(async ()=>{
     const nome = document.getElementById('newPartName').value.trim();
+    const categoria = document.getElementById('newPartCategory').value.trim();
     const supplierId = document.getElementById('newPartSupplier').value;
     const preco = parseFloat(document.getElementById('newPartPrice').value);
 
@@ -2951,7 +2943,7 @@ function addPart(){
       return false;
     }
     try{
-      const payload = Object.assign(partToDb({nome, supplierId, preco}), {user_id: currentUser.id});
+      const payload = Object.assign(partToDb({nome, categoria, supplierId, preco}), {user_id: currentUser.id});
       const {data, error} = await sb.from('supplier_parts').insert(payload).select().single();
       if(error) throw error;
       state.supplierParts.push(partFromDb(data));
@@ -2977,6 +2969,11 @@ function editPart(partId, supplierId){
       <input type="text" id="editPartName" value="${esc(part.nome)}">
     </div>
     <div class="field">
+      <label>Categoria</label>
+      <input type="text" id="editPartCategory" list="partCategoryOptions" value="${esc(part.categoria||'')}" placeholder="Ex: Tela, Subplaca, Bateria...">
+      <datalist id="partCategoryOptions">${partCategoryOptionsHtml()}</datalist>
+    </div>
+    <div class="field">
       <label>Fornecedor</label>
       <select id="editPartSupplier">
         ${suppliers.map(s=>`<option value="${s.id}" ${s.id === supplierId ? 'selected' : ''}>${esc(s.nome)}</option>`).join('')}
@@ -2990,6 +2987,7 @@ function editPart(partId, supplierId){
 
   openModal(async ()=>{
     const nome = document.getElementById('editPartName').value.trim();
+    const categoria = document.getElementById('editPartCategory').value.trim();
     const newSupplierId = document.getElementById('editPartSupplier').value;
     const preco = parseFloat(document.getElementById('editPartPrice').value);
 
@@ -2998,9 +2996,10 @@ function editPart(partId, supplierId){
       return false;
     }
     try{
-      const {error} = await sb.from('supplier_parts').update(partToDb({nome, supplierId:newSupplierId, preco})).eq('id', partId);
+      const {error} = await sb.from('supplier_parts').update(partToDb({nome, categoria, supplierId:newSupplierId, preco})).eq('id', partId);
       if(error) throw error;
       part.nome = nome;
+      part.categoria = categoria;
       part.supplierId = newSupplierId;
       part.preco = preco;
     }catch(e){ showToast('Erro ao salvar: ' + e.message); return false; }
@@ -3021,97 +3020,96 @@ async function deletePart(partId){
   }catch(e){ showToast('Erro ao excluir: ' + e.message); }
 }
 
-function searchPrice(){
-  const partName = document.getElementById('searchPart').value.trim().toLowerCase();
-  const supplierId = document.getElementById('selectSupplier').value;
+let lastGeneratedPartId = null;
 
-  if(!partName || !supplierId){
-    showToast('Preencha o nome da peça e selecione um fornecedor');
-    return;
-  }
-
-  const part = state.supplierParts.find(p => p.nome.toLowerCase().includes(partName) && p.supplierId === supplierId);
-  const supplier = state.suppliers.find(s => s.id === supplierId);
-
-  if(!part){
-    showToast('Peça não encontrada para este fornecedor');
-    return;
-  }
-
+function generateBudgetForPart(part){
+  const supplier = state.suppliers.find(s=>s.id===part.supplierId);
   const margin = parseFloat(document.getElementById('marginProfit').value) || 30;
   const finalPrice = part.preco * (1 + margin/100);
 
-  document.getElementById('resultPart').textContent = esc(part.nome);
-  document.getElementById('resultSupplier').textContent = esc(supplier.nome);
+  lastGeneratedPartId = part.id;
+  document.getElementById('resultPart').textContent = part.nome;
+  document.getElementById('resultSupplier').textContent = supplier ? supplier.nome : '—';
   document.getElementById('resultCost').textContent = fmt(part.preco);
   document.getElementById('resultMargin').textContent = margin + '%';
   document.getElementById('resultPrice').textContent = fmt(finalPrice);
   document.getElementById('resultBox').style.display = 'block';
 }
 
+function renderSearchPartResults(query){
+  const resultsEl = document.getElementById('searchPartResults');
+  const supplierFilter = document.getElementById('selectSupplier').value;
+  const q = query.trim().toLowerCase();
+  if(!q){ resultsEl.style.display='none'; resultsEl.innerHTML=''; return; }
+
+  let matches = state.supplierParts.filter(p => p.nome.toLowerCase().includes(q) || (p.categoria||'').toLowerCase().includes(q));
+  if(supplierFilter) matches = matches.filter(p => p.supplierId === supplierFilter);
+  matches = matches.slice(0,8);
+
+  if(matches.length===0){
+    resultsEl.innerHTML = `<div class="autocomplete-empty">Nenhuma peça encontrada</div>`;
+    resultsEl.style.display='block';
+    return;
+  }
+  resultsEl.innerHTML = matches.map(p=>{
+    const supplier = state.suppliers.find(s=>s.id===p.supplierId);
+    return `<div class="autocomplete-item" data-pick-part="${p.id}">
+      <b>${esc(p.nome)}</b>${p.categoria ? ` <span class="subtle">— ${esc(p.categoria)}</span>` : ''}
+      <div class="subtle">${esc(supplier ? supplier.nome : '—')} · ${fmt(p.preco)}</div>
+    </div>`;
+  }).join('');
+  resultsEl.style.display='block';
+}
+
 document.getElementById('btnAddSupplier').addEventListener('click', addSupplier);
 document.getElementById('btnAddPart').addEventListener('click', addPart);
-document.getElementById('btnSearchPrice').addEventListener('click', searchPrice);
 document.getElementById('btnCloseSupplierParts').addEventListener('click', ()=>{
   document.getElementById('supplierPartsBox').style.display = 'none';
   currentOpenSupplierId = null;
 });
 document.getElementById('supplierPartsSearch').addEventListener('input', renderSupplierPartsFiltered);
 document.getElementById('supplierPartsSort').addEventListener('change', renderSupplierPartsFiltered);
+document.getElementById('supplierPartsCategoryFilter').addEventListener('change', renderSupplierPartsFiltered);
 
-document.getElementById('searchPart').addEventListener('keypress', e=>{
-  if(e.key==='Enter') searchPrice();
+const searchPartInput = document.getElementById('searchPart');
+const searchPartResultsEl = document.getElementById('searchPartResults');
+searchPartInput.addEventListener('input', e=>{ lastGeneratedPartId = null; renderSearchPartResults(e.target.value); });
+searchPartInput.addEventListener('focus', e=> renderSearchPartResults(e.target.value));
+searchPartResultsEl.addEventListener('click', e=>{
+  const item = e.target.closest('[data-pick-part]');
+  if(!item) return;
+  const part = state.supplierParts.find(p=>p.id===item.dataset.pickPart);
+  if(!part) return;
+  searchPartInput.value = part.nome;
+  searchPartResultsEl.style.display = 'none';
+  generateBudgetForPart(part);
+});
+document.addEventListener('click', e=>{
+  if(e.target!==searchPartInput && !e.target.closest('#searchPartResults')) searchPartResultsEl.style.display='none';
 });
 
 document.getElementById('selectSupplier').addEventListener('change', ()=>{
   document.getElementById('resultBox').style.display = 'none';
+  lastGeneratedPartId = null;
+  renderSearchPartResults(searchPartInput.value);
 });
 
 document.getElementById('marginProfit').addEventListener('change', ()=>{
-  if(document.getElementById('resultBox').style.display !== 'none'){
-    searchPrice();
+  if(lastGeneratedPartId){
+    const part = state.supplierParts.find(p=>p.id===lastGeneratedPartId);
+    if(part) generateBudgetForPart(part);
   }
 });
 
 // Listener delegado (único) para editar/deletar/whatsapp das peças da tabela do fornecedor aberto
 document.getElementById('supplierPartsTable').addEventListener('click', e=>{
-  const tr = e.target.closest('tr[data-part-id]');
   const edit = e.target.closest('[data-edit-part]');
   const del = e.target.closest('[data-delete-part]');
   const wa = e.target.closest('[data-whatsapp-part]');
-  
-  // Se clicou em um botão, executa o handler do botão
-  if(edit || del || wa){
-    if(edit) editPart(edit.dataset.editPart, edit.dataset.supplierId);
-    if(del) deletePart(del.dataset.deletePart);
-    if(wa) sendWhatsappForPart(wa.dataset.whatsappPart);
-  }
-  // Se clicou na linha (sem clicar em botão), gera o orçamento
-  else if(tr && !edit && !del && !wa){
-    generateQuoteFromPart(tr.dataset.partId, tr.dataset.partName, parseFloat(tr.dataset.partPreco), currentOpenSupplierId);
-  }
+  if(edit) editPart(edit.dataset.editPart, edit.dataset.supplierId);
+  if(del) deletePart(del.dataset.deletePart);
+  if(wa) sendWhatsappForPart(wa.dataset.whatsappPart);
 });
-
-function generateQuoteFromPart(partId, partName, partPreco, supplierId){
-  const supplier = state.suppliers.find(s => s.id === supplierId);
-  if(!supplier) return;
-  
-  const margin = parseFloat(document.getElementById('marginProfit').value) || 30;
-  const finalPrice = partPreco * (1 + margin/100);
-  
-  document.getElementById('resultPart').textContent = esc(partName);
-  document.getElementById('resultSupplier').textContent = esc(supplier.nome);
-  document.getElementById('resultCost').textContent = fmt(partPreco);
-  document.getElementById('resultMargin').textContent = margin + '%';
-  document.getElementById('resultPrice').textContent = fmt(finalPrice);
-  document.getElementById('resultBox').style.display = 'block';
-  
-  // Scroll para mostrar o resultado (especialmente útil em celular)
-  setTimeout(()=>{
-    const resultBox = document.getElementById('resultBox');
-    if(resultBox) resultBox.scrollIntoView({behavior:'smooth', block:'nearest'});
-  }, 100);
-}
 
 
 /* ============================= MODAL GENERIC ============================= */
