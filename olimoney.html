@@ -801,6 +801,7 @@ tbody tr:hover{background:var(--surface-2);}
                   <option value="preco_desc">Maior preço</option>
                 </select>
               </div>
+              <div class="subtle" style="margin-bottom:8px;">Clique em uma peça para gerar o orçamento</div>
               <div class="table-scroll" style="max-height:300px;">
                 <table id="supplierPartsTable">
                   <thead>
@@ -819,22 +820,17 @@ tbody tr:hover{background:var(--surface-2);}
             </div>
           </div>
 
-          <!-- Painel de Consulta -->
+          <!-- Painel de Orçamento -->
           <div class="panel">
-            <div class="panel-title">Consultar Preço</div>
-            <div class="field" style="position:relative;">
-              <label>Nome da peça</label>
-              <input type="text" id="searchPart" placeholder="Digite para buscar..." autocomplete="off">
-              <div id="searchPartResults" class="autocomplete-results" style="display:none;"></div>
-            </div>
-            <div class="field">
-              <label>Fornecedor (opcional, para filtrar)</label>
-              <select id="selectSupplier">
-                <option value="">Todos os fornecedores</option>
-              </select>
+            <div class="panel-title">Painel de Orçamento</div>
+            <div class="panel-sub" style="margin-top:-8px; margin-bottom:14px;">Clique em uma peça na lista do fornecedor para gerar o orçamento</div>
+
+            <div class="empty" id="budgetEmpty">
+              <div class="empty-title">Nenhum orçamento gerado</div>
+              <div>Selecione um fornecedor ao lado e clique em uma peça.</div>
             </div>
 
-            <div id="resultBox" style="display:none; margin-top:20px; padding:16px; background:var(--surface-2); border-radius:8px;">
+            <div id="resultBox" style="display:none; padding:16px; background:var(--surface-2); border-radius:8px;">
               <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
                 <span style="color:var(--muted);">Peça:</span>
                 <span id="resultPart" style="font-weight:600;"></span>
@@ -1280,7 +1276,7 @@ function setView(v){
   if(v==='stock') renderStock();
   if(v==='expenses') renderExpenses();
   if(v==='history') renderHistory();
-  if(v==='prices'){ renderSuppliers(); updateSupplierSelect(); }
+  if(v==='prices'){ renderSuppliers(); }
   window.scrollTo(0,0);
 }
 document.getElementById('navlist').addEventListener('click', e=>{
@@ -2695,17 +2691,6 @@ document.getElementById('suppliersList').addEventListener('mouseout', e=>{
   if(item) item.style.background = 'var(--surface-2)';
 });
 
-function updateSupplierSelect(){
-  const suppliers = state.suppliers;
-  const select = document.getElementById('selectSupplier');
-  const currentValue = select.value;
-
-  select.innerHTML = '<option value="">Todos os fornecedores</option>' +
-    suppliers.map(s=>`<option value="${s.id}">${esc(s.nome)}</option>`).join('');
-
-  select.value = currentValue;
-}
-
 function showSupplierParts(supplierId, supplierName){
   currentOpenSupplierId = supplierId;
   document.getElementById('selectedSupplierName').textContent = supplierName;
@@ -2749,7 +2734,7 @@ function renderSupplierPartsFiltered(){
   } else {
     document.getElementById('supplierPartsEmpty').style.display = 'none';
     document.getElementById('supplierPartsBody').innerHTML = supplierParts.map(p=>`
-      <tr>
+      <tr data-generate-part="${p.id}" style="cursor:pointer;" title="Clique para gerar orçamento com esta peça">
         <td><b>${esc(p.nome)}</b>${p.categoria ? `<div class="subtle">${esc(p.categoria)}</div>` : ''}</td>
         <td class="right num">${fmt(p.preco)}</td>
         <td class="center t-actions">
@@ -2830,7 +2815,6 @@ function addSupplier(){
       state.suppliers.push(supplierFromDb(data));
     }catch(e){ showToast('Erro ao salvar: ' + e.message); return false; }
     renderSuppliers();
-    updateSupplierSelect();
     showToast('Fornecedor adicionado');
   });
 }
@@ -2874,7 +2858,6 @@ function editSupplier(id){
       supplier.whatsapp = whatsapp;
     }catch(e){ showToast('Erro ao salvar: ' + e.message); return false; }
     renderSuppliers();
-    updateSupplierSelect();
     refreshOpenSupplierParts();
     showToast('Fornecedor atualizado');
   });
@@ -2892,7 +2875,6 @@ async function deleteSupplier(id){
       document.getElementById('supplierPartsBox').style.display = 'none';
     }
     renderSuppliers();
-    updateSupplierSelect();
     showToast('Fornecedor removido');
   }catch(e){ showToast('Erro ao excluir: ' + e.message); }
 }
@@ -3033,32 +3015,8 @@ function generateBudgetForPart(part){
   document.getElementById('resultCost').textContent = fmt(part.preco);
   document.getElementById('resultMargin').textContent = margin + '%';
   document.getElementById('resultPrice').textContent = fmt(finalPrice);
+  document.getElementById('budgetEmpty').style.display = 'none';
   document.getElementById('resultBox').style.display = 'block';
-}
-
-function renderSearchPartResults(query){
-  const resultsEl = document.getElementById('searchPartResults');
-  const supplierFilter = document.getElementById('selectSupplier').value;
-  const q = query.trim().toLowerCase();
-  if(!q){ resultsEl.style.display='none'; resultsEl.innerHTML=''; return; }
-
-  let matches = state.supplierParts.filter(p => p.nome.toLowerCase().includes(q) || (p.categoria||'').toLowerCase().includes(q));
-  if(supplierFilter) matches = matches.filter(p => p.supplierId === supplierFilter);
-  matches = matches.slice(0,8);
-
-  if(matches.length===0){
-    resultsEl.innerHTML = `<div class="autocomplete-empty">Nenhuma peça encontrada</div>`;
-    resultsEl.style.display='block';
-    return;
-  }
-  resultsEl.innerHTML = matches.map(p=>{
-    const supplier = state.suppliers.find(s=>s.id===p.supplierId);
-    return `<div class="autocomplete-item" data-pick-part="${p.id}">
-      <b>${esc(p.nome)}</b>${p.categoria ? ` <span class="subtle">— ${esc(p.categoria)}</span>` : ''}
-      <div class="subtle">${esc(supplier ? supplier.nome : '—')} · ${fmt(p.preco)}</div>
-    </div>`;
-  }).join('');
-  resultsEl.style.display='block';
 }
 
 document.getElementById('btnAddSupplier').addEventListener('click', addSupplier);
@@ -3071,29 +3029,6 @@ document.getElementById('supplierPartsSearch').addEventListener('input', renderS
 document.getElementById('supplierPartsSort').addEventListener('change', renderSupplierPartsFiltered);
 document.getElementById('supplierPartsCategoryFilter').addEventListener('change', renderSupplierPartsFiltered);
 
-const searchPartInput = document.getElementById('searchPart');
-const searchPartResultsEl = document.getElementById('searchPartResults');
-searchPartInput.addEventListener('input', e=>{ lastGeneratedPartId = null; renderSearchPartResults(e.target.value); });
-searchPartInput.addEventListener('focus', e=> renderSearchPartResults(e.target.value));
-searchPartResultsEl.addEventListener('click', e=>{
-  const item = e.target.closest('[data-pick-part]');
-  if(!item) return;
-  const part = state.supplierParts.find(p=>p.id===item.dataset.pickPart);
-  if(!part) return;
-  searchPartInput.value = part.nome;
-  searchPartResultsEl.style.display = 'none';
-  generateBudgetForPart(part);
-});
-document.addEventListener('click', e=>{
-  if(e.target!==searchPartInput && !e.target.closest('#searchPartResults')) searchPartResultsEl.style.display='none';
-});
-
-document.getElementById('selectSupplier').addEventListener('change', ()=>{
-  document.getElementById('resultBox').style.display = 'none';
-  lastGeneratedPartId = null;
-  renderSearchPartResults(searchPartInput.value);
-});
-
 document.getElementById('marginProfit').addEventListener('change', ()=>{
   if(lastGeneratedPartId){
     const part = state.supplierParts.find(p=>p.id===lastGeneratedPartId);
@@ -3101,14 +3036,19 @@ document.getElementById('marginProfit').addEventListener('change', ()=>{
   }
 });
 
-// Listener delegado (único) para editar/deletar/whatsapp das peças da tabela do fornecedor aberto
+// Listener delegado (único) para editar/deletar/whatsapp/clicar-e-gerar-orçamento das peças da tabela do fornecedor aberto
 document.getElementById('supplierPartsTable').addEventListener('click', e=>{
   const edit = e.target.closest('[data-edit-part]');
   const del = e.target.closest('[data-delete-part]');
   const wa = e.target.closest('[data-whatsapp-part]');
-  if(edit) editPart(edit.dataset.editPart, edit.dataset.supplierId);
-  if(del) deletePart(del.dataset.deletePart);
-  if(wa) sendWhatsappForPart(wa.dataset.whatsappPart);
+  if(edit){ editPart(edit.dataset.editPart, edit.dataset.supplierId); return; }
+  if(del){ deletePart(del.dataset.deletePart); return; }
+  if(wa){ sendWhatsappForPart(wa.dataset.whatsappPart); return; }
+  const row = e.target.closest('[data-generate-part]');
+  if(row){
+    const part = state.supplierParts.find(p=>p.id===row.dataset.generatePart);
+    if(part) generateBudgetForPart(part);
+  }
 });
 
 
