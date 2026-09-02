@@ -801,7 +801,6 @@ tbody tr:hover{background:var(--surface-2);}
                   <option value="preco_desc">Maior preço</option>
                 </select>
               </div>
-              <div class="subtle" style="margin-bottom:8px;">Clique em uma peça para gerar o orçamento automaticamente</div>
               <div class="table-scroll" style="max-height:300px;">
                 <table id="supplierPartsTable">
                   <thead>
@@ -856,77 +855,7 @@ tbody tr:hover{background:var(--surface-2);}
                 <span style="color:var(--teal); font-weight:600;">Orçamento para cliente:</span>
                 <span id="resultPrice" class="num" style="font-weight:700; font-size:18px; color:var(--teal);"></span>
               </div>
-
-              <div style="margin-top:16px; padding-top:16px; border-top:1px dashed var(--line);">
-                <div class="field" style="margin-bottom:12px;">
-                  <label>Valor do serviço (R$)</label>
-                  <input type="number" id="resultServiceValue" step="0.01" min="0" value="0">
-                </div>
-                <div style="display:flex; justify-content:space-between; margin-bottom:14px; padding-bottom:14px; border-bottom:1px solid var(--line);">
-                  <span style="color:var(--ink-soft); font-weight:600;">Total do orçamento:</span>
-                  <span id="resultTotal" class="num" style="font-weight:700; font-size:16px;"></span>
-                </div>
-
-                <div class="field" style="margin-bottom:10px;">
-                  <label>Forma de pagamento</label>
-                  <select id="resultPaymentMethod">
-                    <option value="dinheiro">Dinheiro / Pix</option>
-                    <option value="debito">Cartão de Débito</option>
-                    <option value="credito">Cartão de Crédito</option>
-                  </select>
-                </div>
-
-                <div id="resultCreditFields" style="display:none;">
-                  <div class="form-grid">
-                    <div class="field">
-                      <label>Bandeira</label>
-                      <select id="resultCardBrand"></select>
-                    </div>
-                    <div class="field">
-                      <label>Parcelas</label>
-                      <select id="resultCardInstallments"></select>
-                    </div>
-                  </div>
-                  <div style="display:flex; justify-content:space-between; margin-top:12px; font-size:12px; color:var(--muted);">
-                    <span>Taxa aplicada:</span>
-                    <span id="resultCardFeePct" class="num"></span>
-                  </div>
-                  <div style="display:flex; justify-content:space-between; margin-top:3px; font-size:12px; color:var(--muted);">
-                    <span>Valor da taxa:</span>
-                    <span id="resultCardFeeValue" class="num"></span>
-                  </div>
-                </div>
-
-                <div style="display:flex; justify-content:space-between; margin-top:16px; padding-top:16px; border-top:1px solid var(--line);">
-                  <span style="color:var(--teal); font-weight:700;">Cliente paga:</span>
-                  <span id="resultFinalToClient" class="num" style="font-weight:700; font-size:19px; color:var(--teal);"></span>
-                </div>
-                <div id="resultInstallmentInfo" style="text-align:right; font-size:12px; color:var(--muted); margin-top:2px;"></div>
-              </div>
             </div>
-          </div>
-        </div>
-
-        <div class="panel">
-          <div class="panel-head">
-            <div>
-              <div class="panel-title">Taxas de Cartão</div>
-              <div class="panel-sub">Cadastre a taxa da maquininha por bandeira e nº de parcelas</div>
-            </div>
-            <button class="btn btn-primary btn-sm" id="btnAddCardFee">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-              Nova taxa
-            </button>
-          </div>
-          <div class="table-scroll">
-            <table>
-              <thead><tr><th>Bandeira</th><th class="right">Parcelas</th><th class="right">Taxa (%)</th><th class="center">Ações</th></tr></thead>
-              <tbody id="cardFeesTableBody"></tbody>
-            </table>
-          </div>
-          <div class="empty" id="cardFeesEmpty" style="display:none;">
-            <div class="empty-title">Nenhuma taxa cadastrada</div>
-            <div>Cadastre as taxas da sua maquininha por bandeira e parcelas para calcular o valor das parcelas no orçamento.</div>
           </div>
         </div>
       </section>
@@ -990,7 +919,7 @@ const LICENSE_SECRET = "olimoney-2026-troque-este-segredo";
 const BUSINESS_NAME = "TEKNO ELETRÔNICOS"; // usado na mensagem de WhatsApp e em outros textos
 
 /* ============================= STATE ============================= */
-let state = { products: [], orders: [], expenses: [], sales: [], saleItems: [], orderMedia: [], suppliers: [], supplierParts: [], cardFees: [] };
+let state = { products: [], orders: [], expenses: [], sales: [], saleItems: [], orderMedia: [], suppliers: [], supplierParts: [] };
 let currentUser = null;
 let license = { trialStart: null, licensed: false, email: '' };
 
@@ -1091,7 +1020,7 @@ function orderMediaFromDb(r){
 
 async function fetchAllData(){
   try{
-    const [pr, or_, ex, sa, si, om, sup, sp, cf] = await Promise.all([
+    const [pr, or_, ex, sa, si, om, sup, sp] = await Promise.all([
       sb.from('products').select('*').order('nome'),
       sb.from('orders').select('*').order('data_abertura', {ascending:false}),
       sb.from('expenses').select('*').order('data', {ascending:false}),
@@ -1099,8 +1028,7 @@ async function fetchAllData(){
       sb.from('sale_items').select('*'),
       sb.from('order_media').select('*').order('created_at', {ascending:false}),
       sb.from('suppliers').select('*').order('nome'),
-      sb.from('supplier_parts').select('*'),
-      sb.from('card_fees').select('*').order('bandeira').order('parcelas')
+      sb.from('supplier_parts').select('*')
     ]);
     if(pr.error) throw pr.error;
     if(or_.error) throw or_.error;
@@ -1110,7 +1038,6 @@ async function fetchAllData(){
     if(om.error) throw om.error;
     if(sup.error) throw sup.error;
     if(sp.error) throw sp.error;
-    if(cf.error) throw cf.error;
     state.products = pr.data.map(productFromDb);
     state.orders = or_.data.map(orderFromDb);
     state.expenses = ex.data.map(expenseFromDb);
@@ -1119,7 +1046,6 @@ async function fetchAllData(){
     state.orderMedia = om.data.map(orderMediaFromDb);
     state.suppliers = sup.data.map(supplierFromDb);
     state.supplierParts = sp.data.map(partFromDb);
-    state.cardFees = cf.data.map(cardFeeFromDb);
   }catch(e){
     showToast('Erro ao carregar dados: ' + e.message);
   }
@@ -1129,8 +1055,6 @@ function supplierFromDb(r){ return {id:r.id, nome:r.nome, contato:r.contato||'',
 function supplierToDb(s){ return {nome:s.nome, contato:s.contato, whatsapp:s.whatsapp}; }
 function partFromDb(r){ return {id:r.id, supplierId:r.supplier_id, nome:r.nome, preco:Number(r.preco||0), categoria:r.categoria||''}; }
 function partToDb(p){ return {supplier_id:p.supplierId, nome:p.nome, preco:p.preco, categoria:p.categoria}; }
-function cardFeeFromDb(r){ return {id:r.id, bandeira:r.bandeira, parcelas:Number(r.parcelas||1), taxaPercentual:Number(r.taxa_percentual||0)}; }
-function cardFeeToDb(f){ return {bandeira:f.bandeira, parcelas:f.parcelas, taxa_percentual:f.taxaPercentual}; }
 function partCategoryOptionsHtml(){
   const defaults = ['Tela','Subplaca','Bateria','Câmera','Conector de Carga','Alto-falante','Microfone','Flex','Carcaça','Botão','Sensor','Outros'];
   const fromParts = state.supplierParts.map(p=>p.categoria).filter(Boolean);
@@ -1356,7 +1280,7 @@ function setView(v){
   if(v==='stock') renderStock();
   if(v==='expenses') renderExpenses();
   if(v==='history') renderHistory();
-  if(v==='prices'){ renderSuppliers(); updateSupplierSelect(); renderCardFees(); }
+  if(v==='prices'){ renderSuppliers(); updateSupplierSelect(); }
   window.scrollTo(0,0);
 }
 document.getElementById('navlist').addEventListener('click', e=>{
@@ -2825,7 +2749,7 @@ function renderSupplierPartsFiltered(){
   } else {
     document.getElementById('supplierPartsEmpty').style.display = 'none';
     document.getElementById('supplierPartsBody').innerHTML = supplierParts.map(p=>`
-      <tr data-generate-part="${p.id}" style="cursor:pointer;" title="Clique para gerar orçamento com esta peça">
+      <tr>
         <td><b>${esc(p.nome)}</b>${p.categoria ? `<div class="subtle">${esc(p.categoria)}</div>` : ''}</td>
         <td class="right num">${fmt(p.preco)}</td>
         <td class="center t-actions">
@@ -3097,7 +3021,6 @@ async function deletePart(partId){
 }
 
 let lastGeneratedPartId = null;
-let currentBudgetPecaTotal = 0;
 
 function generateBudgetForPart(part){
   const supplier = state.suppliers.find(s=>s.id===part.supplierId);
@@ -3105,214 +3028,13 @@ function generateBudgetForPart(part){
   const finalPrice = part.preco * (1 + margin/100);
 
   lastGeneratedPartId = part.id;
-  currentBudgetPecaTotal = finalPrice;
   document.getElementById('resultPart').textContent = part.nome;
   document.getElementById('resultSupplier').textContent = supplier ? supplier.nome : '—';
   document.getElementById('resultCost').textContent = fmt(part.preco);
   document.getElementById('resultMargin').textContent = margin + '%';
   document.getElementById('resultPrice').textContent = fmt(finalPrice);
-  document.getElementById('resultServiceValue').value = '0';
   document.getElementById('resultBox').style.display = 'block';
-  updatePaymentCalculation();
 }
-
-/* ============================= TAXAS DE CARTÃO / PAGAMENTO NO ORÇAMENTO ============================= */
-const CARD_BRAND_OPTIONS = ['Visa','Mastercard','Elo','American Express','Hipercard','Outra'];
-
-function renderCardFees(){
-  const fees = state.cardFees;
-  const body = document.getElementById('cardFeesTableBody');
-  const empty = document.getElementById('cardFeesEmpty');
-
-  if(fees.length === 0){
-    body.innerHTML = '';
-    empty.style.display = 'block';
-  } else {
-    empty.style.display = 'none';
-    const sorted = fees.slice().sort((a,b)=> a.bandeira.localeCompare(b.bandeira) || a.parcelas - b.parcelas);
-    body.innerHTML = sorted.map(f=>`
-      <tr>
-        <td><b>${esc(f.bandeira)}</b></td>
-        <td class="right num">${f.parcelas}x</td>
-        <td class="right num">${f.taxaPercentual.toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2})}%</td>
-        <td class="center t-actions">
-          <button class="icon-btn" title="Editar" data-edit-card-fee="${f.id}">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-          </button>
-          <button class="icon-btn btn-danger" title="Deletar" data-delete-card-fee="${f.id}">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>
-          </button>
-        </td>
-      </tr>
-    `).join('');
-  }
-  updateCardBrandOptions();
-}
-
-document.getElementById('cardFeesTableBody').addEventListener('click', e=>{
-  const edit = e.target.closest('[data-edit-card-fee]');
-  const del = e.target.closest('[data-delete-card-fee]');
-  if(edit) editCardFee(edit.dataset.editCardFee);
-  if(del) deleteCardFee(del.dataset.deleteCardFee);
-});
-
-function addCardFee(){
-  const modalBody = document.getElementById('modalBody');
-  const modalTitle = document.getElementById('modalTitle');
-  modalTitle.textContent = 'Nova Taxa de Cartão';
-
-  modalBody.innerHTML = `
-    <div class="field">
-      <label>Bandeira</label>
-      <input type="text" id="newFeeBrand" list="cardBrandOptions" placeholder="Ex: Visa, Mastercard...">
-      <datalist id="cardBrandOptions">${CARD_BRAND_OPTIONS.map(b=>`<option value="${esc(b)}"></option>`).join('')}</datalist>
-    </div>
-    <div class="field">
-      <label>Nº de parcelas</label>
-      <input type="number" id="newFeeInstallments" min="1" max="24" step="1" value="1">
-    </div>
-    <div class="field">
-      <label>Taxa (%)</label>
-      <input type="number" id="newFeeRate" min="0" max="100" step="0.01" placeholder="Ex: 3.5">
-    </div>
-  `;
-
-  setTimeout(()=> document.getElementById('newFeeBrand').focus(), 100);
-
-  openModal(async ()=>{
-    const bandeira = document.getElementById('newFeeBrand').value.trim();
-    const parcelas = parseInt(document.getElementById('newFeeInstallments').value, 10);
-    const taxaPercentual = parseFloat(document.getElementById('newFeeRate').value);
-
-    if(!bandeira || !parcelas || parcelas<1 || isNaN(taxaPercentual) || taxaPercentual<0){
-      showToast('Preencha todos os campos corretamente');
-      return false;
-    }
-    try{
-      const payload = Object.assign(cardFeeToDb({bandeira, parcelas, taxaPercentual}), {user_id: currentUser.id});
-      const {data, error} = await sb.from('card_fees').insert(payload).select().single();
-      if(error) throw error;
-      state.cardFees.push(cardFeeFromDb(data));
-    }catch(e){ showToast('Erro ao salvar: ' + e.message); return false; }
-    renderCardFees();
-    showToast('Taxa adicionada');
-  });
-}
-
-function editCardFee(id){
-  const fee = state.cardFees.find(f=>f.id===id);
-  if(!fee) return;
-
-  const modalBody = document.getElementById('modalBody');
-  const modalTitle = document.getElementById('modalTitle');
-  modalTitle.textContent = 'Editar Taxa de Cartão';
-
-  modalBody.innerHTML = `
-    <div class="field">
-      <label>Bandeira</label>
-      <input type="text" id="editFeeBrand" list="cardBrandOptionsEdit" value="${esc(fee.bandeira)}">
-      <datalist id="cardBrandOptionsEdit">${CARD_BRAND_OPTIONS.map(b=>`<option value="${esc(b)}"></option>`).join('')}</datalist>
-    </div>
-    <div class="field">
-      <label>Nº de parcelas</label>
-      <input type="number" id="editFeeInstallments" min="1" max="24" step="1" value="${fee.parcelas}">
-    </div>
-    <div class="field">
-      <label>Taxa (%)</label>
-      <input type="number" id="editFeeRate" min="0" max="100" step="0.01" value="${fee.taxaPercentual}">
-    </div>
-  `;
-
-  openModal(async ()=>{
-    const bandeira = document.getElementById('editFeeBrand').value.trim();
-    const parcelas = parseInt(document.getElementById('editFeeInstallments').value, 10);
-    const taxaPercentual = parseFloat(document.getElementById('editFeeRate').value);
-
-    if(!bandeira || !parcelas || parcelas<1 || isNaN(taxaPercentual) || taxaPercentual<0){
-      showToast('Preencha todos os campos corretamente');
-      return false;
-    }
-    try{
-      const {error} = await sb.from('card_fees').update(cardFeeToDb({bandeira, parcelas, taxaPercentual})).eq('id', id);
-      if(error) throw error;
-      fee.bandeira = bandeira;
-      fee.parcelas = parcelas;
-      fee.taxaPercentual = taxaPercentual;
-    }catch(e){ showToast('Erro ao salvar: ' + e.message); return false; }
-    renderCardFees();
-    updatePaymentCalculation();
-    showToast('Taxa atualizada');
-  });
-}
-
-async function deleteCardFee(id){
-  if(!confirm('Tem certeza que deseja deletar esta taxa?')) return;
-  try{
-    const {error} = await sb.from('card_fees').delete().eq('id', id);
-    if(error) throw error;
-    state.cardFees = state.cardFees.filter(f=>f.id!==id);
-  }catch(e){ showToast('Erro ao excluir: ' + e.message); return; }
-  renderCardFees();
-  updatePaymentCalculation();
-  showToast('Taxa removida');
-}
-
-document.getElementById('btnAddCardFee').addEventListener('click', addCardFee);
-
-function updateCardBrandOptions(){
-  const select = document.getElementById('resultCardBrand');
-  const currentValue = select.value;
-  const brands = Array.from(new Set(state.cardFees.map(f=>f.bandeira))).sort();
-  select.innerHTML = brands.length
-    ? brands.map(b=>`<option value="${esc(b)}">${esc(b)}</option>`).join('')
-    : '<option value="">Nenhuma bandeira cadastrada</option>';
-  select.value = brands.includes(currentValue) ? currentValue : (brands[0]||'');
-  updateCardInstallmentOptions();
-}
-
-function updateCardInstallmentOptions(){
-  const brand = document.getElementById('resultCardBrand').value;
-  const select = document.getElementById('resultCardInstallments');
-  const currentValue = select.value;
-  const options = state.cardFees.filter(f=>f.bandeira===brand).sort((a,b)=>a.parcelas-b.parcelas);
-  select.innerHTML = options.length
-    ? options.map(f=>`<option value="${f.parcelas}">${f.parcelas}x</option>`).join('')
-    : '<option value="">Sem taxas cadastradas para esta bandeira</option>';
-  const values = options.map(f=>String(f.parcelas));
-  select.value = values.includes(currentValue) ? currentValue : (values[0]||'');
-}
-
-function updatePaymentCalculation(){
-  const serviceValue = parseFloat(document.getElementById('resultServiceValue').value) || 0;
-  const total = currentBudgetPecaTotal + serviceValue;
-  document.getElementById('resultTotal').textContent = fmt(total);
-
-  const method = document.getElementById('resultPaymentMethod').value;
-  const creditFields = document.getElementById('resultCreditFields');
-  creditFields.style.display = (method === 'credito') ? 'block' : 'none';
-
-  let feePct = 0, feeValue = 0, finalToClient = total, installments = 1;
-
-  if(method === 'credito'){
-    const brand = document.getElementById('resultCardBrand').value;
-    installments = parseInt(document.getElementById('resultCardInstallments').value, 10) || 1;
-    const fee = state.cardFees.find(f=>f.bandeira===brand && f.parcelas===installments);
-    feePct = fee ? fee.taxaPercentual : 0;
-    feeValue = total * feePct / 100;
-    finalToClient = total + feeValue;
-  }
-
-  document.getElementById('resultCardFeePct').textContent = feePct.toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2}) + '%';
-  document.getElementById('resultCardFeeValue').textContent = fmt(feeValue);
-  document.getElementById('resultFinalToClient').textContent = fmt(finalToClient);
-  document.getElementById('resultInstallmentInfo').textContent =
-    (method === 'credito' && installments > 1) ? `${installments}x de ${fmt(finalToClient/installments)}` : '';
-}
-
-document.getElementById('resultServiceValue').addEventListener('input', updatePaymentCalculation);
-document.getElementById('resultPaymentMethod').addEventListener('change', updatePaymentCalculation);
-document.getElementById('resultCardBrand').addEventListener('change', ()=>{ updateCardInstallmentOptions(); updatePaymentCalculation(); });
-document.getElementById('resultCardInstallments').addEventListener('change', updatePaymentCalculation);
 
 function renderSearchPartResults(query){
   const resultsEl = document.getElementById('searchPartResults');
@@ -3384,18 +3106,9 @@ document.getElementById('supplierPartsTable').addEventListener('click', e=>{
   const edit = e.target.closest('[data-edit-part]');
   const del = e.target.closest('[data-delete-part]');
   const wa = e.target.closest('[data-whatsapp-part]');
-  if(edit){ editPart(edit.dataset.editPart, edit.dataset.supplierId); return; }
-  if(del){ deletePart(del.dataset.deletePart); return; }
-  if(wa){ sendWhatsappForPart(wa.dataset.whatsappPart); return; }
-  const row = e.target.closest('[data-generate-part]');
-  if(row){
-    const part = state.supplierParts.find(p=>p.id===row.dataset.generatePart);
-    if(part){
-      document.getElementById('searchPart').value = part.nome;
-      document.getElementById('searchPartResults').style.display = 'none';
-      generateBudgetForPart(part);
-    }
-  }
+  if(edit) editPart(edit.dataset.editPart, edit.dataset.supplierId);
+  if(del) deletePart(del.dataset.deletePart);
+  if(wa) sendWhatsappForPart(wa.dataset.whatsappPart);
 });
 
 
