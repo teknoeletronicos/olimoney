@@ -870,9 +870,18 @@ tbody tr:hover{background:var(--surface-2);}
                       <option value="credito">Crédito</option>
                     </select>
                   </div>
-                  <div class="field" id="installmentsBox" style="margin-bottom:10px; display:none;">
-                    <label>Parcelas</label>
-                    <select id="cardInstallments"></select>
+                  <div style="display:flex; gap:10px; margin-bottom:10px;">
+                    <div class="field" id="installmentsBox" style="flex:1; display:none; margin-bottom:0;">
+                      <label>Parcelas</label>
+                      <select id="cardInstallments"></select>
+                    </div>
+                    <div class="field" style="flex:1; margin-bottom:0;">
+                      <label>Quem paga a taxa?</label>
+                      <select id="feeResponsibility">
+                        <option value="cliente">Repassar ao cliente</option>
+                        <option value="eu">Eu assumo</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
 
@@ -3098,18 +3107,31 @@ function updatePaymentBreakdown(){
 
   const n = isParceladoCredito ? (parseInt(document.getElementById('cardInstallments').value, 10) || 1) : 1;
   const fee = getCurrentFee();
+  const feeOnClient = document.getElementById('feeResponsibility').value === 'cliente';
 
-  // Taxa é repassada ao cliente: o valor cobrado do cliente é ajustado para que,
-  // depois de descontada a taxa da maquininha, você receba o valor cheio do orçamento.
-  const clientTotal = fee > 0 ? (currentBudgetBase / (1 - fee)) : currentBudgetBase;
+  let clientTotal, feeAmount, profit;
+  if(fee <= 0){
+    // Dinheiro / Pix: sem taxa
+    clientTotal = currentBudgetBase;
+    feeAmount = 0;
+    profit = currentBudgetBase - currentBudgetCost;
+  } else if(feeOnClient){
+    // Taxa repassada: o cliente paga mais, para que você receba o valor cheio do orçamento
+    clientTotal = currentBudgetBase / (1 - fee);
+    feeAmount = clientTotal - currentBudgetBase;
+    profit = currentBudgetBase - currentBudgetCost;
+  } else {
+    // Você assume a taxa: cliente paga o valor normal do orçamento, seu lucro diminui
+    clientTotal = currentBudgetBase;
+    feeAmount = currentBudgetBase * fee;
+    profit = (currentBudgetBase - feeAmount) - currentBudgetCost;
+  }
   const installmentValue = clientTotal / n;
-  const feeAmount = clientTotal - currentBudgetBase;
-  const profit = currentBudgetBase - currentBudgetCost;
 
   document.getElementById('resultInstallmentValue').textContent =
     (n > 1 ? n + 'x de ' : '') + fmt(installmentValue);
   document.getElementById('resultFee').textContent =
-    fee > 0 ? (fmt(feeAmount) + ' (' + (fee*100).toFixed(2).replace('.', ',') + '%)') : 'Sem taxa';
+    fee > 0 ? (fmt(feeAmount) + ' (' + (fee*100).toFixed(2).replace('.', ',') + '%)' + (feeOnClient ? ' — no cliente' : ' — por sua conta')) : 'Sem taxa';
   document.getElementById('resultClientTotal').textContent = fmt(clientTotal);
   document.getElementById('resultProfit').textContent = fmt(profit);
 }
@@ -3136,6 +3158,7 @@ function generateBudgetForPart(part, resetPayment = true){
     document.getElementById('paymentMethod').value = 'dinheiro';
     document.getElementById('cardType').value = 'debito';
     document.getElementById('cardInstallments').value = '1';
+    document.getElementById('feeResponsibility').value = 'cliente';
   }
   updatePaymentBreakdown();
 }
@@ -3143,6 +3166,7 @@ function generateBudgetForPart(part, resetPayment = true){
 document.getElementById('paymentMethod').addEventListener('change', updatePaymentBreakdown);
 document.getElementById('cardType').addEventListener('change', updatePaymentBreakdown);
 document.getElementById('cardInstallments').addEventListener('change', updatePaymentBreakdown);
+document.getElementById('feeResponsibility').addEventListener('change', updatePaymentBreakdown);
 
 document.getElementById('btnAddSupplier').addEventListener('click', addSupplier);
 document.getElementById('btnAddPart').addEventListener('click', addPart);
